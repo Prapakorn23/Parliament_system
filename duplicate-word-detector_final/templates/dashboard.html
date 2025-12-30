@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ตรวจจับคำซ้ำ - รัฐสภาไทย</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    
+    <!-- Simple Header -->
+    <header class="bg-white border-b-2 border-blue-500 shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <!-- Logo & Title -->
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-search text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900">ตรวจจับคำซ้ำ</h1>
+                        <p class="text-sm text-gray-500">Thai Parliament</p>
+                    </div>
+                </div>
+                
+                <!-- Quick Help -->
+                <button id="helpBtn" class="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                    <i class="fas fa-question-circle"></i>
+                    <span class="hidden md:inline">วิธีใช้</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Progress Steps Indicator -->
+    <div class="bg-white border-b border-gray-200">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-center gap-2 md:gap-8">
+                <!-- Step 1 -->
+                <div id="step1" class="flex items-center gap-2 step-indicator active">
+                    <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">1</div>
+                    <span class="text-sm font-medium text-gray-900 hidden sm:inline">เลือกข้อมูล</span>
+                </div>
+                <div class="w-8 h-0.5 bg-gray-300"></div>
+                
+                <!-- Step 2 -->
+                <div id="step2" class="flex items-center gap-2 step-indicator">
+                    <div class="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center text-sm font-bold">2</div>
+                    <span class="text-sm font-medium text-gray-400 hidden sm:inline">วิเคราะห์</span>
+                </div>
+                <div class="w-8 h-0.5 bg-gray-300"></div>
+                
+                <!-- Step 3 -->
+                <div id="step3" class="flex items-center gap-2 step-indicator">
+                    <div class="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center text-sm font-bold">3</div>
+                    <span class="text-sm font-medium text-gray-400 hidden sm:inline">ดูผลลัพธ์</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        
+        <!-- Main Input Card -->
+        <div id="inputSection" class="bg-white rounded-xl shadow-md border border-gray-200 p-6 md:p-8 mb-6">
+            
+            <!-- Section Title with Instructions -->
+            <div class="mb-6 text-center">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">
+                    <i class="fas fa-file-circle-check text-blue-600 mr-2"></i>
+                    เลือกวิธีนำเข้าข้อมูล
+                </h2>
+                <p class="text-gray-600">เลือกวิธีใดวิธีหนึ่งเพื่อเริ่มตรวจสอบคำซ้ำ</p>
+            </div>
+
+            <!-- Tab Selection -->
+            <div class="flex border-b border-gray-200 mb-6">
+                <button id="fileTab" class="flex-1 py-3 px-4 text-center font-medium border-b-2 border-blue-600 text-blue-600 transition-colors">
+                    <i class="fas fa-file-arrow-up mr-2"></i>
+                    <span class="hidden sm:inline">อัปโหลดไฟล์</span>
+                    <span class="sm:hidden">ไฟล์</span>
+                </button>
+                <button id="textTab" class="flex-1 py-3 px-4 text-center font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
+                    <i class="fas fa-keyboard mr-2"></i>
+                    <span class="hidden sm:inline">พิมพ์ข้อความ</span>
+                    <span class="sm:hidden">ข้อความ</span>
+                </button>
+            </div>
+
+            <!-- File Upload Tab Content -->
+            <div id="fileTabContent" class="tab-content">
+                <!-- File Upload Area -->
+                <div id="uploadArea" class="upload-area-simple border-2 border-dashed border-gray-300 rounded-xl p-8 md:p-12 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
+                    <input type="file" id="fileInput" class="hidden" accept=".txt,.text,.pdf,.doc,.docx" multiple>
+                    
+                    <div class="mb-4">
+                        <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+                    </div>
+                    
+                    <p class="text-xl font-semibold text-gray-700 mb-2">
+                        คลิกหรือลากไฟล์มาที่นี่
+                    </p>
+                    <p class="text-sm text-gray-500 mb-4" data-file-size-text>
+                        รองรับไฟล์: PDF, DOC, DOCX, TXT (สูงสุด 200MB)
+                    </p>
+                    
+                    <!-- Selected Files Display -->
+                    <div id="selectedFilesContainer" class="hidden mt-4">
+                        <div class="text-sm font-medium text-gray-700 mb-2">
+                            ไฟล์ที่เลือก: <span id="fileCount">0</span> ไฟล์
+                        </div>
+                        <div id="selectedFilesList" class="space-y-2 max-h-40 overflow-y-auto">
+                            <!-- ไฟล์จะถูกเพิ่มที่นี่โดย JavaScript -->
+                        </div>
+                        <button id="removeAllFiles" class="mt-2 text-sm text-red-600 hover:text-red-800">
+                            <i class="fas fa-times"></i> ลบทั้งหมด
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- File Info -->
+                <div class="mt-4 p-4 bg-blue-50 rounded-lg">
+                    <div class="flex items-start gap-3 text-sm">
+                        <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                        <div class="text-blue-900">
+                            <p class="font-medium mb-1">ข้อมูลเพิ่มเติม:</p>
+                            <ul class="space-y-1 text-blue-800">
+                                <li>• ไฟล์ PDF แบบสแกนจะถูกแปลงเป็นข้อความอัตโนมัติด้วย OCR</li>
+                                <li>• ข้อมูลของคุณปลอดภัย จะถูกลบหลังการวิเคราะห์</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Text Input Tab Content -->
+            <div id="textTabContent" class="tab-content hidden">
+                <div class="relative">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-align-left mr-1"></i>
+                        พิมพ์หรือวางข้อความที่ต้องการวิเคราะห์
+                    </label>
+                    <textarea id="textInput" 
+                              rows="12" 
+                              class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-y"
+                              placeholder="ตัวอย่าง: วางข้อความเอกสารที่ต้องการตรวจสอบคำซ้ำที่นี่&#10;&#10;ระบบจะวิเคราะห์และแสดงคำที่ปรากฏบ่อยๆ พร้อมสถิติต่างๆ ให้คุณทราบ"></textarea>
+                    
+                    <!-- Character Count -->
+                    <div class="absolute bottom-3 right-3 text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">
+                        <span id="charCount">0</span> ตัวอักษร
+                    </div>
+                </div>
+                
+                <!-- Text Tips -->
+                <div class="mt-4 p-4 bg-amber-50 rounded-lg">
+                    <div class="flex items-start gap-3 text-sm">
+                        <i class="fas fa-lightbulb text-amber-600 mt-0.5"></i>
+                        <div class="text-amber-900">
+                            <p class="font-medium mb-1">เคล็ดลับ:</p>
+                            <ul class="space-y-1 text-amber-800">
+                                <li>• ยิ่งข้อความยาว ผลลัพธ์จะยิ่งแม่นยำ</li>
+                                <li>• รองรับทั้งภาษาไทยและภาษาอังกฤษ</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                <button id="analyzeBtn" class="flex-1 sm:flex-none px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-lg">
+                    <i class="fas fa-play-circle"></i>
+                    <span>เริ่มวิเคราะห์</span>
+                </button>
+                
+                <button id="resetBtn" class="flex-1 sm:flex-none px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+                    <i class="fas fa-redo"></i>
+                    <span>เริ่มใหม่</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Features Info -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
+                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-file-alt text-blue-600 text-xl"></i>
+                </div>
+                <h3 class="font-semibold text-gray-900 mb-1">หลายรูปแบบ</h3>
+                <p class="text-sm text-gray-600">PDF, Word, Text</p>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
+                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-bolt text-green-600 text-xl"></i>
+                </div>
+                <h3 class="font-semibold text-gray-900 mb-1">รวดเร็ว</h3>
+                <p class="text-sm text-gray-600">ผลลัพธ์ภายในไม่กี่วินาที</p>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
+                <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-shield-alt text-purple-600 text-xl"></i>
+                </div>
+                <h3 class="font-semibold text-gray-900 mb-1">ปลอดภัย</h3>
+                <p class="text-sm text-gray-600">ไม่บันทึกข้อมูล</p>
+            </div>
+        </div>
+
+        <!-- Progress Section -->
+        <div id="progressContainer" class="hidden bg-white rounded-xl shadow-md border border-gray-200 p-8 mb-6">
+            <div class="text-center">
+                <!-- Simple Loader -->
+                <div class="mb-4">
+                    <div class="inline-block animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-blue-600"></div>
+                </div>
+                
+                <!-- Progress Text -->
+                <h3 class="text-xl font-bold text-gray-900 mb-2" id="progressMessage">กำลังประมวลผล...</h3>
+                <p class="text-gray-600 mb-4" id="progressSubMessage">กรุณารอสักครู่</p>
+                
+                <!-- Simple Progress Bar -->
+                <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <p class="text-sm text-gray-500 mt-2"><span id="progressPercent">0</span>%</p>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden space-y-6">
+            
+            <!-- Results Header -->
+            <div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-4 flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                    <i class="fas fa-check text-white text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-green-900">วิเคราะห์เสร็จสิ้น!</h2>
+                    <p class="text-sm text-green-700">ผลลัพธ์พร้อมแสดงแล้ว</p>
+                </div>
+                <div class="ml-auto flex gap-2">
+                    <button id="resetResultsBtn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                        <i class="fas fa-redo"></i>
+                        <span class="hidden sm:inline">เริ่มใหม่</span>
+                    </button>
+                    <button id="exportBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                        <i class="fas fa-download"></i>
+                        <span class="hidden sm:inline">ดาวน์โหลด</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Summary Statistics -->
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <i class="fas fa-chart-simple text-blue-600"></i>
+                    สถิติโดยรวม
+                </h3>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- Total Words -->
+                    <div class="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div class="text-3xl font-bold text-blue-600 mb-1" id="totalWords">0</div>
+                        <div class="text-sm text-gray-600">คำทั้งหมด</div>
+                    </div>
+                    
+                    <!-- Unique Words -->
+                    <div class="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                        <div class="text-3xl font-bold text-green-600 mb-1" id="uniqueWords">0</div>
+                        <div class="text-sm text-gray-600">คำไม่ซ้ำ</div>
+                    </div>
+                    
+                    <!-- Categories -->
+                    <div class="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
+                        <div class="text-3xl font-bold text-purple-600 mb-1" id="totalCategories">0</div>
+                        <div class="text-sm text-gray-600">หมวดหมู่</div>
+                    </div>
+                    
+                    <!-- Average -->
+                    <div class="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
+                        <div class="text-3xl font-bold text-orange-600 mb-1" id="avgFrequency">0</div>
+                        <div class="text-sm text-gray-600">ค่าเฉลี่ย</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Section -->
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+                <div class="mb-4">
+                    <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2 mb-1">
+                        <i class="fas fa-chart-bar text-blue-600"></i>
+                        คำที่พบบ่อยสุด 15 คำแรก
+                    </h3>
+                    <p class="text-sm text-gray-600">แสดงกราฟความถี่ของคำที่ปรากฏมากที่สุด</p>
+                </div>
+                <div class="chart-container bg-gray-50 rounded-lg p-4" style="position: relative; height: 400px;">
+                    <canvas id="wordFrequencyChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Categories Section -->
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+                <div class="mb-4">
+                    <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2 mb-1">
+                        <i class="fas fa-folder-open text-purple-600"></i>
+                        หมวดหมู่คำ
+                    </h3>
+                    <p class="text-sm text-gray-600">คำแบ่งตามประเภท คลิกเพื่อดูรายละเอียด</p>
+                </div>
+                <div id="categoriesContainer" class="space-y-3">
+                    <!-- Categories will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Word Frequency Table -->
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2 mb-1">
+                            <i class="fas fa-list-ol text-green-600"></i>
+                            รายการคำทั้งหมด
+                        </h3>
+                        <p class="text-sm text-gray-600">
+                            แสดง <span id="wordCount" class="font-semibold text-blue-600">0</span> คำ
+                            (หน้าละ 15 คำ)
+                        </p>
+                    </div>
+                    <div id="pageInfo" class="text-sm font-medium text-gray-700">
+                        หน้า <span id="currentPageDisplay">1</span> จาก <span id="totalPages">1</span>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-16">
+                                    อันดับ
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                    คำ
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">
+                                    ความถี่
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-48">
+                                    สัดส่วน
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="wordTableBody" class="bg-white divide-y divide-gray-200">
+                            <!-- Rows will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination Controls -->
+                <div id="paginationControls" class="mt-6 flex items-center justify-between">
+                    <button id="prevPage" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                        <i class="fas fa-chevron-left"></i>
+                        ก่อนหน้า
+                    </button>
+                    
+                    <div id="pageNumbers" class="flex gap-2">
+                        <!-- Page numbers will be inserted here -->
+                    </div>
+                    
+                    <button id="nextPage" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                        ถัดไป
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simple Footer -->
+    <footer class="bg-white border-t border-gray-200 py-8 mt-12">
+        <div class="container mx-auto px-4 max-w-5xl">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-600">
+                <div>
+                    <p class="font-medium text-gray-900 mb-1">ระบบตรวจจับคำซ้ำอัตโนมัติ</p>
+                    <p>&copy; <span id="currentYear"></span> รัฐสภาไทย - Thai Parliament</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-blue-600 transition-colors">คู่มือ</a>
+                    <span class="text-gray-300">|</span>
+                    <a href="#" class="hover:text-blue-600 transition-colors">ติดต่อ</a>
+                    <span class="text-gray-300">|</span>
+                    <a href="#" class="hover:text-blue-600 transition-colors">ความเป็นส่วนตัว</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Help Modal -->
+    <div id="helpModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <h3 class="text-xl font-bold text-gray-900">
+                    <i class="fas fa-question-circle text-blue-600 mr-2"></i>
+                    วิธีใช้งาน
+                </h3>
+                <button id="closeHelp" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <!-- Step 1 -->
+                <div>
+                    <h4 class="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                        <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">1</span>
+                        เลือกข้อมูล
+                    </h4>
+                    <p class="text-gray-600 ml-8">เลือกอัปโหลดไฟล์ (PDF, DOC, DOCX, TXT) หรือพิมพ์ข้อความโดยตรง</p>
+                </div>
+                
+                <!-- Step 2 -->
+                <div>
+                    <h4 class="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                        <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">2</span>
+                        กดปุ่มวิเคราะห์
+                    </h4>
+                    <p class="text-gray-600 ml-8">คลิกปุ่ม "เริ่มวิเคราะห์" และรอผลลัพธ์สักครู่</p>
+                </div>
+                
+                <!-- Step 3 -->
+                <div>
+                    <h4 class="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                        <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">3</span>
+                        ดูผลลัพธ์
+                    </h4>
+                    <p class="text-gray-600 ml-8">ดูสถิติ กราฟ และรายการคำที่พบ พร้อมดาวน์โหลดได้ทันที</p>
+                </div>
+                
+                <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <p class="text-sm text-blue-900">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <strong>หมายเหตุ:</strong> ข้อมูลของคุณจะถูกลบอัตโนมัติหลังการวิเคราะห์เพื่อความปลอดภัย
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom JavaScript -->
+    <script src="/static/script.js"></script>
+    
+    <!-- Set current year in footer -->
+    <script>
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+    </script>
+</body>
+</html>

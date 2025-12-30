@@ -1,0 +1,552 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แปลง PDF เป็นข้อความ - PDF to Text Converter</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+        }
+    </style>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    
+    <!-- Simple Header -->
+    <header class="bg-white border-b-2 border-blue-500 shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <!-- Logo & Title -->
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-file-pdf text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900">แปลง PDF เป็นข้อความ</h1>
+                        <p class="text-sm text-gray-500">PDF to Text Converter & AI Summarizer</p>
+                    </div>
+                </div>
+                
+                <!-- Quick Help -->
+                <button id="helpBtn" class="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                    <i class="fas fa-question-circle"></i>
+                    <span class="hidden md:inline">วิธีใช้</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Progress Steps Indicator -->
+    <div class="bg-white border-b border-gray-200">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-center gap-2 md:gap-8">
+                <!-- Step 1 -->
+                <div id="step1" class="flex items-center gap-2 step-indicator active">
+                    <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">1</div>
+                    <span class="text-sm font-medium text-gray-900 hidden sm:inline">อัปโหลดไฟล์</span>
+                </div>
+                <div class="w-8 h-0.5 bg-gray-300"></div>
+                
+                <!-- Step 2 -->
+                <div id="step2" class="flex items-center gap-2 step-indicator">
+                    <div class="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center text-sm font-bold">2</div>
+                    <span class="text-sm font-medium text-gray-400 hidden sm:inline">แปลงข้อความ</span>
+                </div>
+                <div class="w-8 h-0.5 bg-gray-300"></div>
+                
+                <!-- Step 3 -->
+                <div id="step3" class="flex items-center gap-2 step-indicator">
+                    <div class="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center text-sm font-bold">3</div>
+                    <span class="text-sm font-medium text-gray-400 hidden sm:inline">ดูผลลัพธ์</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        
+        <!-- Search Bar Section -->
+        <div class="search-section bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">
+            <div class="mb-4">
+                <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-search text-blue-600"></i>
+                    ค้นหาไฟล์
+                </h2>
+            </div>
+            
+            <!-- Search Input -->
+            <div class="relative" id="searchContainer">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    class="w-full px-4 py-3 pl-12 pr-32 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    placeholder="ค้นหาจากชื่อไฟล์, เนื้อหา, หรือ tags..."
+                    autocomplete="off"
+                />
+                <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                
+                <!-- Search Button -->
+                <button 
+                    id="searchBtn" 
+                    class="absolute right-2 top-1/2 transform -translate-y-1/2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                >
+                    ค้นหา
+                </button>
+                
+                <!-- Autocomplete Dropdown -->
+                <div id="autocompleteDropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <!-- Suggestions will be inserted here -->
+                </div>
+            </div>
+            
+            <!-- Filter Options -->
+            <div class="mt-4 flex flex-wrap gap-3 items-center">
+                <!-- File Type Filter -->
+                <select id="fileTypeFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">ทุกประเภทไฟล์</option>
+                    <option value="pdf">PDF</option>
+                    <option value="docx">DOCX</option>
+                    <option value="txt">TXT</option>
+                    <option value="jpg">JPG</option>
+                    <option value="png">PNG</option>
+                </select>
+                
+                <!-- Date Range Filter -->
+                <input 
+                    type="date" 
+                    id="dateFromFilter" 
+                    class="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="จากวันที่"
+                />
+                <span class="text-gray-500">ถึง</span>
+                <input 
+                    type="date" 
+                    id="dateToFilter" 
+                    class="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="ถึงวันที่"
+                />
+                
+                <!-- Clear Filters Button -->
+                <button 
+                    id="clearFiltersBtn" 
+                    class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+                >
+                    <i class="fas fa-times"></i> ล้างตัวกรอง
+                </button>
+            </div>
+            
+            <!-- Tag Suggestions (Auto-complete) -->
+            <div id="tagSuggestions" class="mt-4 flex flex-wrap gap-2 hidden">
+                <span class="text-sm text-gray-600">แนะนำ:</span>
+                <!-- Tags will be inserted here dynamically -->
+            </div>
+            
+            <!-- Search Results -->
+            <div id="searchResults" class="mt-6 hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-gray-900">
+                        ผลการค้นหา (<span id="resultCount">0</span> รายการ)
+                    </h3>
+                    <button 
+                        id="closeResultsBtn" 
+                        class="text-gray-500 hover:text-gray-700"
+                    >
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div id="resultsContainer" class="space-y-4">
+                    <!-- Search results will be inserted here -->
+                </div>
+                
+                <!-- Pagination -->
+                <div id="pagination" class="mt-6 flex justify-center gap-2">
+                    <!-- Pagination buttons will be inserted here -->
+                </div>
+            </div>
+            
+            <!-- Loading Indicator -->
+            <div id="searchLoading" class="hidden mt-4 text-center">
+                <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
+                <p class="text-gray-600 mt-2">กำลังค้นหา...</p>
+            </div>
+        </div>
+        
+        <!-- Main Input Card -->
+        <div id="inputSection" class="bg-white rounded-xl shadow-md border border-gray-200 p-6 md:p-8 mb-6">
+            
+            <!-- Section Title with Instructions -->
+            <div class="mb-6 text-center">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">
+                    <i class="fas fa-file-upload text-blue-600 mr-2"></i>
+                    อัปโหลดไฟล์เพื่อแปลงเป็นข้อความ
+                </h2>
+                <p class="text-gray-600">รองรับไฟล์ PDF, DOCX, TXT และรูปภาพ (JPG, PNG, GIF)</p>
+            </div>
+
+            <!-- File Upload Area -->
+            <form id="uploadForm" action="/extract" method="post" enctype="multipart/form-data">
+                <div id="uploadArea" class="upload-area-simple border-2 border-dashed border-gray-300 rounded-xl p-8 md:p-12 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
+                    <input type="file" id="fileInput" name="file" class="hidden" accept="application/pdf,.docx,.txt,image/*">
+                    
+                    <div class="mb-4">
+                        <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+                    </div>
+                    
+                    <p class="text-xl font-semibold text-gray-700 mb-2">
+                        คลิกหรือลากไฟล์มาที่นี่
+                    </p>
+                    <p class="text-sm text-gray-500 mb-4">
+                        รองรับไฟล์: PDF, DOCX, TXT, JPG, PNG, GIF (สูงสุด 50MB)
+                    </p>
+                    
+                    <!-- Selected File Display -->
+                    <div id="selectedFileContainer" class="hidden mt-4">
+                        <div class="text-sm font-medium text-gray-700 mb-2">
+                            ไฟล์ที่เลือก:
+                        </div>
+                        <div id="selectedFileName" class="p-2 bg-blue-50 rounded-lg text-sm text-gray-800">
+                            <!-- File name will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- File Info -->
+                <div class="mt-4 p-4 bg-blue-50 rounded-lg">
+                    <div class="flex items-start gap-3 text-sm">
+                        <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                        <div class="text-blue-900">
+                            <p class="font-medium mb-1">ข้อมูลเพิ่มเติม:</p>
+                            <ul class="space-y-1 text-blue-800">
+                                <li>• ไฟล์ PDF และรูปภาพจะถูกแปลงเป็นข้อความอัตโนมัติด้วย OCR</li>
+                                <li>• ข้อมูลของคุณปลอดภัย จะถูกลบหลังการประมวลผล</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                    <button type="submit" id="convertBtn" class="flex-1 sm:flex-none px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-lg">
+                        <i class="fas fa-file-alt"></i>
+                        <span>แปลงไฟล์เป็นข้อความ</span>
+                    </button>
+                    
+                    <button type="button" id="resetBtn" class="flex-1 sm:flex-none px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+                        <i class="fas fa-redo"></i>
+                        <span>เริ่มใหม่</span>
+                    </button>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div id="uploadProgress" class="hidden mt-4">
+                    <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div id="progressFill" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-2 text-center" id="progressText">กำลังประมวลผล...</p>
+                </div>
+            </form>
+        </div>
+
+        <!-- Quick Features Info -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
+                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-file-alt text-blue-600 text-xl"></i>
+                </div>
+                <h3 class="font-semibold text-gray-900 mb-1">หลายรูปแบบ</h3>
+                <p class="text-sm text-gray-600">PDF, DOCX, TXT, รูปภาพ</p>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
+                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-eye text-green-600 text-xl"></i>
+                </div>
+                <h3 class="font-semibold text-gray-900 mb-1">OCR อัตโนมัติ</h3>
+                <p class="text-sm text-gray-600">แปลงรูปภาพเป็นข้อความ</p>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
+                <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-robot text-purple-600 text-xl"></i>
+                </div>
+                <h3 class="font-semibold text-gray-900 mb-1">AI สรุป</h3>
+                <p class="text-sm text-gray-600">สรุปข้อความอัตโนมัติ</p>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        {% if error_message %}
+        <div id="errorBox" class="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-6">
+            <div class="flex items-start gap-3">
+                <i class="fas fa-exclamation-triangle text-red-600 mt-0.5"></i>
+                <div>
+                    <strong class="text-red-900">เกิดข้อผิดพลาด</strong>
+                    <p class="text-red-700 mt-1">{{ error_message }}</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Results Section -->
+        {% if extracted_text %}
+        <section id="resultSection" class="space-y-6">
+            <!-- Results Header -->
+            <div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-4 flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                    <i class="fas fa-check text-white text-lg"></i>
+                </div>
+                <div class="flex-1">
+                    <h2 class="text-lg font-bold text-green-900">แปลงไฟล์เสร็จสิ้น!</h2>
+                    <p class="text-sm text-green-700">{{ filename }} • {{ extracted_text|length }} ตัวอักษร
+                        {% if total_pages > 0 %} • {{ total_pages }} หน้า{% endif %}
+                        {% if ocr_used %} • <span class="font-semibold">OCR</span>{% endif %}
+                    </p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="summarizeText()" id="summarizeBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                        <i class="fas fa-robot"></i>
+                        <span class="hidden sm:inline">สรุปข้อความ</span>
+                    </button>
+                    <button onclick="resetAll()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                        <i class="fas fa-redo"></i>
+                        <span class="hidden sm:inline">เริ่มใหม่</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Text Content -->
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+                <div class="mb-4 flex items-center justify-between flex-wrap gap-4">
+                    <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <i class="fas fa-file-alt text-blue-600"></i>
+                        ข้อความที่แปลงได้
+                    </h3>
+                    <div class="flex gap-2 flex-wrap">
+                        {% if total_pages > 1 %}
+                        <button onclick="toggleView()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                            <i class="fas fa-file"></i>
+                            <span id="viewModeText">ดูทีละหน้า</span>
+                        </button>
+                        {% endif %}
+                        <button onclick="downloadExtractedText()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                            <i class="fas fa-download"></i>
+                            <span>ดาวน์โหลด</span>
+                        </button>
+                        <button onclick="copyToClipboard('resultText')" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                            <i class="fas fa-copy"></i>
+                            <span>คัดลอก</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- View Mode: All Pages -->
+                <div id="allPagesView" class="text-viewer">
+                    <textarea id="resultText" readonly rows="18" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-y font-mono text-sm">{{ extracted_text }}</textarea>
+                </div>
+                
+                <!-- View Mode: Page by Page -->
+                {% if pages_data and total_pages > 1 %}
+                <div id="pageByPageView" class="text-viewer hidden">
+                    <!-- Page Navigation -->
+                    <div class="flex items-center justify-center gap-4 p-4 bg-gray-50 rounded-lg mb-4">
+                        <button onclick="prevPage()" id="prevPageBtn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" disabled>
+                            <i class="fas fa-chevron-left"></i>
+                            <span>หน้าก่อน</span>
+                        </button>
+                        <div class="flex items-center gap-2">
+                            <span>หน้า</span>
+                            <input type="number" id="pageInput" min="1" max="{{ total_pages }}" value="1" onchange="goToPage(this.value)" class="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center font-medium">
+                            <span>/ {{ total_pages }}</span>
+                        </div>
+                        <button onclick="nextPage()" id="nextPageBtn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                            <span>หน้าถัดไป</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Page Content -->
+                    <textarea id="pageText" readonly rows="18" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-y font-mono text-sm"></textarea>
+                    
+                    <!-- Page OCR Status -->
+                    <div id="pageOcrStatus" class="mt-2 p-2 bg-blue-50 rounded-lg hidden">
+                        <div class="flex items-center gap-2 text-sm text-blue-800">
+                            <i class="fas fa-search"></i>
+                            <span>หน้านี้ถูกแปลงด้วย OCR</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Summary Section -->
+            <div id="summarySection" class="bg-white rounded-xl shadow-md border border-gray-200 p-6 hidden">
+                <div class="mb-4 flex items-center justify-between flex-wrap gap-4">
+                    <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <i class="fas fa-robot text-purple-600"></i>
+                        สรุปข้อความ
+                    </h3>
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="downloadSummary()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                            <i class="fas fa-download"></i>
+                            <span>ดาวน์โหลดสรุป</span>
+                        </button>
+                        <button onclick="copyToClipboard('summaryText')" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                            <i class="fas fa-copy"></i>
+                            <span>คัดลอก</span>
+                        </button>
+                        <button onclick="clearSummary()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                            <i class="fas fa-times"></i>
+                            <span>ปิด</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="processingStats" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 hidden">
+                    <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-clock text-2xl text-blue-600"></i>
+                            <div>
+                                <div class="text-xs text-gray-600 uppercase tracking-wide">เวลาประมวลผล</div>
+                                <div class="text-lg font-bold text-gray-900" id="processingTime">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-file text-2xl text-green-600"></i>
+                            <div>
+                                <div class="text-xs text-gray-600 uppercase tracking-wide">ความยาวต้นฉบับ</div>
+                                <div class="text-lg font-bold text-gray-900" id="textLength">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-file-alt text-2xl text-purple-600"></i>
+                            <div>
+                                <div class="text-xs text-gray-600 uppercase tracking-wide">ความยาวสรุป</div>
+                                <div class="text-lg font-bold text-gray-900" id="summaryLength">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <textarea id="summaryText" readonly rows="8" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-y"></textarea>
+            </div>
+        </section>
+        {% endif %}
+    </div>
+
+    <!-- Simple Footer -->
+    <footer class="bg-white border-t border-gray-200 py-8 mt-12">
+        <div class="container mx-auto px-4 max-w-5xl">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-600">
+                <div>
+                    <p class="font-medium text-gray-900 mb-1">PDF to Text Converter & AI Summarizer</p>
+                    <p>&copy; <span id="currentYear"></span> Data Science Lab</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span>รองรับ: PDF, DOCX, TXT, JPG, PNG, GIF</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Help Modal -->
+    <div id="helpModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <h3 class="text-xl font-bold text-gray-900">
+                    <i class="fas fa-question-circle text-blue-600 mr-2"></i>
+                    วิธีใช้งาน
+                </h3>
+                <button id="closeHelp" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <!-- Step 1 -->
+                <div>
+                    <h4 class="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                        <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">1</span>
+                        อัปโหลดไฟล์
+                    </h4>
+                    <p class="text-gray-600 ml-8">เลือกไฟล์ PDF, DOCX, TXT หรือรูปภาพ (JPG, PNG, GIF) ที่ต้องการแปลง</p>
+                </div>
+                
+                <!-- Step 2 -->
+                <div>
+                    <h4 class="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                        <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">2</span>
+                        แปลงไฟล์
+                    </h4>
+                    <p class="text-gray-600 ml-8">คลิกปุ่ม "แปลงไฟล์เป็นข้อความ" และรอผลลัพธ์สักครู่</p>
+                </div>
+                
+                <!-- Step 3 -->
+                <div>
+                    <h4 class="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                        <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">3</span>
+                        ดูผลลัพธ์และสรุป
+                    </h4>
+                    <p class="text-gray-600 ml-8">ดูข้อความที่แปลงได้ พร้อมดาวน์โหลดหรือใช้ AI สรุปข้อความได้ทันที</p>
+                </div>
+                
+                <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <p class="text-sm text-blue-900">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <strong>หมายเหตุ:</strong> ข้อมูลของคุณจะถูกลบอัตโนมัติหลังการประมวลผลเพื่อความปลอดภัย
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom JavaScript -->
+    <script src="/static/script.js"></script>
+    
+    <!-- Set current year in footer -->
+    <script>
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+        
+        // Store extracted text and document info
+        // eslint-disable-next-line
+        {% if extracted_text %}
+        // @ts-ignore - Jinja2 template will be rendered server-side
+        window.documentData = {
+            filename: "{{ filename }}",
+            extractedText: {{ extracted_text|tojson }},
+            totalPages: {{ total_pages|tojson }},
+            pagesData: {{ pages_data|tojson }},
+            from_search: {{ from_search|default(false)|tojson }},
+            extraction_id: {{ extraction_id|default(None)|tojson }}
+        };
+        
+        // Page navigation state
+        // @ts-ignore - Jinja2 template will be rendered server-side
+        window.pageView = {
+            currentPage: 1,
+            totalPages: {{ total_pages|tojson }},
+            isPageByPage: false,
+            pagesData: {{ pages_data|tojson }}
+        };
+        // eslint-disable-next-line
+        {% endif %}
+    </script>
+</body>
+</html>

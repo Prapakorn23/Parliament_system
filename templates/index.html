@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบสนับสนุนการประชุม - Parliament Dashboard</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+        }
+    </style>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    
+    <!-- ============================================
+         Header Section
+         ============================================ -->
+    <header class="bg-white border-b-2 border-blue-500 shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <!-- Logo & Title -->
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-landmark text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900">ระบบสนับสนุนการประชุม</h1>
+                        <p class="text-sm text-gray-500">Parliament Dashboard</p>
+                    </div>
+                </div>
+                
+                <!-- Navigation Links -->
+                <nav class="hidden md:flex items-center gap-4">
+                    <a href="#dashboard" class="text-gray-700 hover:text-blue-600 transition-colors">แดชบอร์ด</a>
+                    <a href="#services" class="text-gray-700 hover:text-blue-600 transition-colors">บริการ</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================
+         Header Section - 2 Boxes
+         กล่องซ้าย: หัวข้อการประชุม
+         กล่องขวา: การติดตามการดำเนินนโยบาย
+         ============================================ -->
+    <section class="container mx-auto px-4 py-6 max-w-7xl">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <!-- Header Box 1: หัวข้อการประชุม (ซ้าย) -->
+            <div class="header-box header-box-left">
+                <div class="header-box-content">
+                    <i class="fas fa-clipboard-list header-icon"></i>
+                    <div>
+                        <h2 class="header-title">หัวข้อการประชุม</h2>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Header Box 2: การติดตามการดำเนินนโยบาย (ขวา) -->
+            <div class="header-box header-box-right">
+                <div class="header-box-content">
+                    <i class="fas fa-tasks header-icon"></i>
+                    <div>
+                        <h2 class="header-title">การติดตามการดำเนินนโยบายของหน่วยงาน</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         Main Dashboard Content - 2 Column Layout
+         คอลัมน์ซ้าย: รายชื่อผู้เข้าร่วมประชุม
+         คอลัมน์ขวา: Document Recommendation, Trend, AI Monitor
+         ============================================ -->
+    <main class="container mx-auto px-4 py-4 max-w-7xl" id="dashboard">
+        
+        <!-- Two Column Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- ============================================
+                 LEFT COLUMN: Information Panel
+                 กล่อง "รายชื่อ" - แสดงรายชื่อผู้เข้าร่วมประชุม
+                 ============================================ -->
+            <aside class="lg:col-span-1">
+                <div class="participants-card bg-white rounded-xl shadow-md border border-gray-200 p-6">
+                    <!-- Card Header -->
+                    <div class="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
+                        <i class="fas fa-users text-blue-600 text-2xl"></i>
+                        <h3 class="text-xl font-bold text-gray-900">รายชื่อ</h3>
+                    </div>
+                    
+                    <!-- Card Content -->
+                    <div class="participants-content">
+                        <p class="text-gray-600 text-sm mb-4">ผู้เข้าร่วมประชุม</p>
+                        
+                        <!-- รายชื่อแบบลิสต์หมายเลข (1-20) แบ่งหน้าละ 10 คน -->
+                        <ol class="participants-list space-y-2 mb-4" id="participantsList">
+                            <!-- หน้าที่ 1 (รายชื่อ 1-10) -->
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">1</span>
+                                <span class="participant-name text-gray-900">นายสมชาย ใจดี</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">2</span>
+                                <span class="participant-name text-gray-900">นางสมหญิง รักงาน</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">3</span>
+                                <span class="participant-name text-gray-900">นายวิชัย เก่งมาก</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">4</span>
+                                <span class="participant-name text-gray-900">นางสาวปราณี สวยงาม</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">5</span>
+                                <span class="participant-name text-gray-900">นายประเสริฐ มั่นคง</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">6</span>
+                                <span class="participant-name text-gray-900">นางมาลี สุขสันต์</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">7</span>
+                                <span class="participant-name text-gray-900">นายดำรงค์ พัฒนา</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">8</span>
+                                <span class="participant-name text-gray-900">นางสาวจิราภรณ์ วิไล</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">9</span>
+                                <span class="participant-name text-gray-900">นายสมศักดิ์ ดีมาก</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">10</span>
+                                <span class="participant-name text-gray-900">นางสาวกมลชนก สุขใจ</span>
+                            </li>
+                            
+                            <!-- หน้าที่ 2 (รายชื่อ 11-20) -->
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">11</span>
+                                <span class="participant-name text-gray-900">นายวีระ เกียรติสูง</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">12</span>
+                                <span class="participant-name text-gray-900">นางอรทัย ใจกว้าง</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">13</span>
+                                <span class="participant-name text-gray-900">นายธนพล มีดี</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">14</span>
+                                <span class="participant-name text-gray-900">นางสาวสิรินาถ รักความจริง</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">15</span>
+                                <span class="participant-name text-gray-900">นายนพพล สุขุม</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">16</span>
+                                <span class="participant-name text-gray-900">นางปรีดา อนันต์</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">17</span>
+                                <span class="participant-name text-gray-900">นายชาญวิทย์ เก่งมาก</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">18</span>
+                                <span class="participant-name text-gray-900">นางสาวปนัดดา ใจเย็น</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">19</span>
+                                <span class="participant-name text-gray-900">นายอภิชัย มั่นคง</span>
+                            </li>
+                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
+                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">20</span>
+                                <span class="participant-name text-gray-900">นางสาวนิตยา สุขสำราญ</span>
+                            </li>
+                        </ol>
+                        
+                        <!-- Pagination Controls -->
+                        <div class="pagination-controls flex items-center justify-center gap-2 mb-4">
+                            <button id="prevPageBtn" class="pagination-btn px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span class="text-sm text-gray-600">
+                                <span id="currentPage">1</span> / <span id="totalPages">2</span>
+                            </span>
+                            <button id="nextPageBtn" class="pagination-btn px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Note: ข้อมูลเชิงสรุป (static information) -->
+                        <p class="info-note text-xs text-gray-500 flex items-center gap-2 pt-3 border-t border-gray-200">
+                            <i class="fas fa-info-circle text-blue-600"></i>
+                            ข้อมูลสรุปการประชุม
+                        </p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- ============================================
+                 RIGHT COLUMN: Analysis & AI Section
+                 กล่อง 3 อัน: Document Recommendation, Trend, AI Monitor
+                 จัดเรียงจากบนลงล่าง
+                 ============================================ -->
+            <section class="lg:col-span-2 space-y-4">
+                
+                <!-- Card 1: Document Recommendation System -->
+                <div class="dashboard-card bg-white rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-lg transition-all">
+                    <div class="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
+                        <i class="fas fa-file-alt text-blue-600 text-2xl"></i>
+                        <h3 class="text-xl font-bold text-gray-900">Document Recommendation System</h3>
+                    </div>
+                    
+                    <p class="text-gray-600 text-sm mb-4">ระบบแนะนำและแปลงเอกสารเป็นข้อความ</p>
+                    
+                    <!-- Features list -->
+                    <ul class="text-sm text-gray-600 mb-6 space-y-2">
+                        <li class="flex items-center gap-2">
+                            <i class="fas fa-check-circle text-green-500 text-xs"></i>
+                            <span>แปลง PDF, DOCX, TXT เป็นข้อความ</span>
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <i class="fas fa-check-circle text-green-500 text-xs"></i>
+                            <span>OCR สำหรับรูปภาพ</span>
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <i class="fas fa-check-circle text-green-500 text-xs"></i>
+                            <span>AI สรุปข้อความอัตโนมัติ</span>
+                        </li>
+                    </ul>
+                    
+                    <!-- Action Button: คลิกแล้วเชื่อมไปยังระบบอื่น -->
+                    <a href="http://localhost:5001" 
+                       target="_blank"
+                       class="block w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-center transition-colors flex items-center justify-center gap-2">
+                        <span>เข้าสู่ระบบ</span>
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+
+                <!-- Card 2: Trend (ขนาดเล็กกว่า Document Recommendation) -->
+                <div class="dashboard-card bg-white rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-lg transition-all">
+                    <div class="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
+                        <i class="fas fa-chart-line text-green-600 text-xl"></i>
+                        <h3 class="text-lg font-bold text-gray-900">Trend</h3>
+                    </div>
+                    
+                    <p class="text-gray-600 text-sm mb-6">วิเคราะห์แนวโน้มและสถิติข้อมูล</p>
+                    
+                    <!-- Action Button -->
+                    <a href="http://localhost:5002" 
+                       target="_blank"
+                       class="block w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-center transition-colors flex items-center justify-center gap-2">
+                        <span>ดูรายละเอียด</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+
+                <!-- Card 3: AI Monitor (Mockup - แค่คลิกได้เท่านั้น) -->
+                <div class="dashboard-card bg-white rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-lg transition-all cursor-pointer">
+                    <div class="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
+                        <i class="fas fa-robot text-purple-600 text-2xl"></i>
+                        <h3 class="text-xl font-bold text-gray-900">AI Monitor</h3>
+                    </div>
+                    
+                    <p class="text-gray-600 text-sm mb-6">ระบบติดตามและตรวจสอบสถานะการทำงานของ AI</p>
+                    
+                    <!-- Action Button (คลิกได้) -->
+                    <button class="block w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg text-center transition-colors flex items-center justify-center gap-2">
+                        <span>เข้าสู่ระบบ</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+                
+            </section>
+            
+        </div>
+    </main>
+
+    <!-- ============================================
+         Footer Section
+         ============================================ -->
+    <footer class="bg-white border-t border-gray-200 py-8 mt-12">
+        <div class="container mx-auto px-4 max-w-7xl">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-600">
+                <div>
+                    <p class="font-medium text-gray-900 mb-1">ระบบสนับสนุนการประชุม - Parliament Dashboard</p>
+                    <p>&copy; <span id="currentYear"></span> รัฐสภาไทย - Thai Parliament</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-blue-600 transition-colors">คู่มือ</a>
+                    <span class="text-gray-300">|</span>
+                    <a href="#" class="hover:text-blue-600 transition-colors">ติดต่อ</a>
+                    <span class="text-gray-300">|</span>
+                    <a href="#" class="hover:text-blue-600 transition-colors">ความเป็นส่วนตัว</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- JavaScript -->
+    <script>
+        // Set current year
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+        
+        // Pagination functionality
+        (function() {
+            const itemsPerPage = 10;
+            let currentPage = 1;
+            const totalItems = 20;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            
+            const participantsList = document.getElementById('participantsList');
+            const participantItems = participantsList.querySelectorAll('.participant-item');
+            const currentPageSpan = document.getElementById('currentPage');
+            const totalPagesSpan = document.getElementById('totalPages');
+            const prevBtn = document.getElementById('prevPageBtn');
+            const nextBtn = document.getElementById('nextPageBtn');
+            
+            // Set total pages
+            totalPagesSpan.textContent = totalPages;
+            
+            function showPage(page) {
+                // Hide all items
+                participantItems.forEach(item => {
+                    item.style.display = 'none';
+                });
+                
+                // Show items for current page
+                participantItems.forEach(item => {
+                    const itemPage = parseInt(item.getAttribute('data-page'));
+                    if (itemPage === page) {
+                        item.style.display = 'flex';
+                    }
+                });
+                
+                // Update current page display
+                currentPageSpan.textContent = page;
+                
+                // Update button states
+                prevBtn.disabled = (page === 1);
+                nextBtn.disabled = (page === totalPages);
+            }
+            
+            // Event listeners
+            prevBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    showPage(currentPage);
+                }
+            });
+            
+            nextBtn.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    showPage(currentPage);
+                }
+            });
+            
+            // Initialize - show first page
+            showPage(1);
+        })();
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,103 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Flask
+instance/
+.webassets-cache
+
+# Environment variables
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.cache
+
+# Model cache and AI/ML files
+.cache/
+models/
+*.pth
+*.pt
+*.h5
+*.ckpt
+transformers_cache/
+.huggingface/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Test files
+test_*.txt
+*_test.txt
+fixed_*.txt
+
+# Upload files (if any)
+uploads/
+uploaded_files/
+
+# OCR temporary files
+ocr_temp/
+pdf_images/
+*.ppm
+*.pbm
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Model weights and checkpoints (if downloaded)
+*.safetensors
+*.bin
+*.onnx

@@ -1,0 +1,154 @@
+/* Simple & Clean UI Styles - Compatible with Tailwind CSS */
+
+:root {
+    /* Color Palette */
+    --primary-blue: #2563eb;
+    --primary-green: #16a34a;
+    --primary-purple: #9333ea;
+    --primary-orange: #ea580c;
+    --gray-text: #6b7280;
+}
+
+/* Ensure Sarabun font is used */
+body {
+    font-family: 'Sarabun', sans-serif;
+}
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.6s ease-in-out;
+}
+
+/* Category chevron rotation */
+.category-chevron {
+    transition: transform 0.3s ease;
+}
+
+.rotate-180 {
+    transform: rotate(180deg);
+}
+
+/* Chart container specific styles */
+.chart-container canvas {
+    max-height: 400px;
+}
+
+/* Custom scrollbar for better UX */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f3f4f6;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* Print styles */
+@media print {
+    header,
+    footer,
+    button,
+    #helpModal {
+        display: none !important;
+    }
+    
+    .no-print {
+        display: none !important;
+    }
+    
+    body {
+        background: white;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .chart-container {
+        height: 300px !important;
+    }
+}
+
+/* Ensure proper spacing for mobile */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
+
+/* Focus visible states for accessibility */
+*:focus-visible {
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
+}
+
+/* Disabled button states */
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Loading animation */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Smooth transitions for interactive elements */
+button,
+a,
+.transition-colors,
+.transition-all {
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure proper text rendering */
+* {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Modal backdrop blur */
+#helpModal {
+    backdrop-filter: blur(4px);
+}
+
+/* Ensure proper z-index stacking */
+header {
+    z-index: 40;
+}
+
+#helpModal {
+    z-index: 50;
+}

@@ -1,0 +1,350 @@
+/* ============================================
+   Main Parliament Dashboard Styles
+   Consistent with TranText and Duplicate projects
+   ============================================ */
+
+:root {
+    /* Color Palette - Matching both projects */
+    --primary-blue: #2563eb;
+    --primary-blue-dark: #1d4ed8;
+    --primary-blue-light: #3b82f6;
+    --primary-green: #16a34a;
+    --primary-green-dark: #15803d;
+    --primary-purple: #9333ea;
+    --gray-text: #6b7280;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-900: #111827;
+}
+
+/* Ensure Sarabun font is used */
+body {
+    font-family: 'Sarabun', sans-serif;
+}
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Dashboard Card Styles */
+.dashboard-card {
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-blue), var(--primary-green));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease;
+}
+
+.dashboard-card:hover::before {
+    transform: scaleX(1);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.6s ease-in-out;
+}
+
+/* Stagger animation for cards */
+.dashboard-card:nth-child(1) {
+    animation: fadeIn 0.6s ease-out 0.1s both;
+}
+
+.dashboard-card:nth-child(2) {
+    animation: fadeIn 0.6s ease-out 0.2s both;
+}
+
+.dashboard-card:nth-child(3) {
+    animation: fadeIn 0.6s ease-out 0.3s both;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--gray-100);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-400);
+}
+
+/* Focus visible states for accessibility */
+*:focus-visible {
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
+}
+
+/* Smooth transitions for interactive elements */
+button,
+a,
+.transition-colors,
+.transition-all {
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure proper text rendering */
+* {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Status indicator pulse animation */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Hover effects for cards */
+.dashboard-card:hover {
+    transform: translateY(-4px);
+}
+
+/* Button hover effects */
+a[href]:hover,
+button:hover:not(:disabled) {
+    transform: scale(1.02);
+}
+
+a[href]:active,
+button:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .dashboard-card {
+        margin-bottom: 1rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .dashboard-card {
+        padding: 1.5rem;
+    }
+}
+
+/* ============================================
+   HEADER BOXES STYLES
+   กล่อง 2 อัน: หัวข้อการประชุม และ การติดตามนโยบาย
+   ============================================ */
+.header-box {
+    background-color: white;
+    border: 2px solid var(--gray-200);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.header-box:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+    border-color: var(--primary-blue);
+}
+
+.header-box-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-icon {
+    font-size: 2.5rem;
+    color: var(--primary-blue);
+    flex-shrink: 0;
+}
+
+.header-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 0.25rem;
+    line-height: 1.4;
+}
+
+.header-subtitle {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    font-weight: 400;
+}
+
+/* ============================================
+   PARTICIPANTS CARD STYLES
+   รายชื่อผู้เข้าร่วมประชุม (คอลัมน์ซ้าย)
+   ============================================ */
+.participants-card {
+    position: sticky;
+    top: 2rem;
+}
+
+.participants-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.participants-list {
+    list-style: none;
+    counter-reset: none;
+}
+
+.participant-item {
+    transition: all 0.2s ease;
+}
+
+.participant-item:hover {
+    transform: translateX(4px);
+}
+
+.participant-number {
+    flex-shrink: 0;
+}
+
+.participant-name {
+    font-weight: 400;
+    flex: 1;
+}
+
+.info-note {
+    margin-top: 0.5rem;
+}
+
+/* ============================================
+   TREND STATS STYLES
+   สถิติในกล่อง Trend
+   ============================================ */
+.trend-stats {
+    background-color: #f0fdf4; /* green-50 */
+}
+
+/* ============================================
+   AI MONITOR STYLES
+   กล่อง AI Monitor (Mockup)
+   ============================================ */
+.status-item {
+    transition: all 0.2s ease;
+}
+
+.status-item:hover {
+    background-color: #f3e8ff !important; /* purple-100 */
+    transform: translateY(-2px);
+}
+
+.ai-summary {
+    background-color: #f3e8ff; /* purple-100 */
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+@media (max-width: 1024px) {
+    .dashboard-main {
+        grid-template-columns: 1fr;
+    }
+    
+    .dashboard-left-column {
+        order: 2;
+    }
+    
+    .dashboard-right-column {
+        order: 1;
+    }
+    
+    .participants-card {
+        position: static;
+    }
+}
+
+@media (max-width: 768px) {
+    .header-box-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .header-icon {
+        font-size: 2rem;
+    }
+    
+    .header-title {
+        font-size: 1rem;
+    }
+    
+    .participant-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* Print styles */
+@media print {
+    header,
+    footer,
+    a,
+    button {
+        display: none !important;
+    }
+    
+    body {
+        background: white;
+    }
+}
+
