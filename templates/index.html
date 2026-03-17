@@ -22,6 +22,9 @@
         }
     </style>
     <link rel="stylesheet" href="/static/style.css">
+    
+    <!-- Socket.IO Client -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     
@@ -44,8 +47,41 @@
                 
                 <!-- Navigation Links -->
                 <nav class="hidden md:flex items-center gap-4">
+                    <!-- Real-time Clock -->
+                    <div class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+                        <i class="fas fa-clock text-blue-600"></i>
+                        <div class="text-sm">
+                            <div id="currentDate" class="font-medium text-gray-700"></div>
+                            <div id="currentTime" class="text-blue-600 font-bold text-base tabular-nums"></div>
+                        </div>
+                    </div>
+                    
+                    <span class="text-gray-300">|</span>
+                    
                     <a href="#dashboard" class="text-gray-700 hover:text-blue-600 transition-colors">แดชบอร์ด</a>
                     <a href="#services" class="text-gray-700 hover:text-blue-600 transition-colors">บริการ</a>
+                    
+                    <!-- Settings Dropdown -->
+                    <div class="relative" id="settingsDropdown">
+                        <button onclick="toggleSettingsMenu()" class="flex items-center gap-2 text-gray-700 hover:text-blue-600 transition-colors px-3 py-2 rounded-lg hover:bg-gray-100">
+                            <i class="fas fa-cog"></i>
+                            <span>ตั้งค่า</span>
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </button>
+                        
+                        <!-- Dropdown Menu -->
+                        <div id="settingsMenu" class="hidden absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                            <button onclick="openChangeMeetingModal()" class="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex items-center gap-3">
+                                <i class="fas fa-edit text-blue-600"></i>
+                                <span class="text-gray-700">เปลี่ยนหัวข้อการประชุม</span>
+                            </button>
+                            <div class="border-t border-gray-100 mx-3"></div>
+                            <button onclick="openRecManagerModal()" class="w-full text-left px-4 py-3 hover:bg-indigo-50 transition-colors flex items-center gap-3">
+                                <i class="fas fa-database text-indigo-600"></i>
+                                <span class="text-gray-700">จัดการฐานข้อมูลวาระการประชุม</span>
+                            </button>
+                        </div>
+                    </div>
                 </nav>
             </div>
         </div>
@@ -57,9 +93,9 @@
          กล่องขวา: การติดตามการดำเนินนโยบาย
          ============================================ -->
     <section class="container mx-auto px-4 py-6 max-w-7xl">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <!-- Header Box 1: หัวข้อการประชุม (ซ้าย) -->
-            <div class="header-box header-box-left">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <!-- Header Box 1: หัวข้อการประชุม (ซ้าย - 1 ส่วน) -->
+            <div class="header-box header-box-left md:col-span-1">
                 <div class="header-box-content">
                     <i class="fas fa-clipboard-list header-icon"></i>
                     <div>
@@ -68,8 +104,8 @@
                 </div>
             </div>
             
-            <!-- Header Box 2: การติดตามการดำเนินนโยบาย (ขวา) -->
-            <div class="header-box header-box-right">
+            <!-- Header Box 2: การติดตามการดำเนินนโยบาย (ขวา - 2 ส่วน) -->
+            <div class="header-box header-box-right md:col-span-2">
                 <div class="header-box-content">
                     <i class="fas fa-tasks header-icon"></i>
                     <div>
@@ -100,116 +136,63 @@
                     <div class="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
                         <i class="fas fa-users text-blue-600 text-2xl"></i>
                         <h3 class="text-xl font-bold text-gray-900">รายชื่อ</h3>
+                        <div class="ml-auto flex items-center gap-2">
+                            <span id="pollingIndicator" class="polling-dot"></span>
+                            <span class="text-xs text-gray-400">Real-time</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Summary Badges -->
+                    <div class="flex items-center gap-3 mb-4">
+                        <p class="text-gray-600 text-sm">ผู้เข้าร่วมประชุม</p>
+                        <div class="ml-auto flex items-center gap-2">
+                            <span class="summary-badge badge-present">
+                                <i class="fas fa-sign-in-alt"></i>
+                                <span id="presentCount">0</span>
+                            </span>
+                            <span class="summary-badge badge-absent">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span id="absentCount">0</span>
+                            </span>
+                        </div>
                     </div>
                     
                     <!-- Card Content -->
                     <div class="participants-content">
-                        <p class="text-gray-600 text-sm mb-4">ผู้เข้าร่วมประชุม</p>
+                        <!-- Loading State -->
+                        <div id="participantsLoading" class="flex flex-col items-center justify-center py-8">
+                            <i class="fas fa-spinner fa-spin text-blue-600 text-2xl mb-2"></i>
+                            <p class="text-gray-500 text-sm">กำลังโหลดข้อมูล...</p>
+                        </div>
+
+                        <!-- Error State -->
+                        <div id="participantsError" class="hidden flex flex-col items-center justify-center py-8">
+                            <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>
+                            <p class="text-red-500 text-sm">ไม่สามารถโหลดข้อมูลได้</p>
+                            <button onclick="fetchAttendees()" class="mt-2 text-blue-600 text-sm hover:underline">ลองใหม่</button>
+                        </div>
                         
-                        <!-- รายชื่อแบบลิสต์หมายเลข (1-20) แบ่งหน้าละ 10 คน -->
-                        <ol class="participants-list space-y-2 mb-4" id="participantsList">
-                            <!-- หน้าที่ 1 (รายชื่อ 1-10) -->
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">1</span>
-                                <span class="participant-name text-gray-900">นายสมชาย ใจดี</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">2</span>
-                                <span class="participant-name text-gray-900">นางสมหญิง รักงาน</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">3</span>
-                                <span class="participant-name text-gray-900">นายวิชัย เก่งมาก</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">4</span>
-                                <span class="participant-name text-gray-900">นางสาวปราณี สวยงาม</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">5</span>
-                                <span class="participant-name text-gray-900">นายประเสริฐ มั่นคง</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">6</span>
-                                <span class="participant-name text-gray-900">นางมาลี สุขสันต์</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">7</span>
-                                <span class="participant-name text-gray-900">นายดำรงค์ พัฒนา</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">8</span>
-                                <span class="participant-name text-gray-900">นางสาวจิราภรณ์ วิไล</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">9</span>
-                                <span class="participant-name text-gray-900">นายสมศักดิ์ ดีมาก</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="1">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">10</span>
-                                <span class="participant-name text-gray-900">นางสาวกมลชนก สุขใจ</span>
-                            </li>
-                            
-                            <!-- หน้าที่ 2 (รายชื่อ 11-20) -->
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">11</span>
-                                <span class="participant-name text-gray-900">นายวีระ เกียรติสูง</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">12</span>
-                                <span class="participant-name text-gray-900">นางอรทัย ใจกว้าง</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">13</span>
-                                <span class="participant-name text-gray-900">นายธนพล มีดี</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">14</span>
-                                <span class="participant-name text-gray-900">นางสาวสิรินาถ รักความจริง</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">15</span>
-                                <span class="participant-name text-gray-900">นายนพพล สุขุม</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">16</span>
-                                <span class="participant-name text-gray-900">นางปรีดา อนันต์</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">17</span>
-                                <span class="participant-name text-gray-900">นายชาญวิทย์ เก่งมาก</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">18</span>
-                                <span class="participant-name text-gray-900">นางสาวปนัดดา ใจเย็น</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">19</span>
-                                <span class="participant-name text-gray-900">นายอภิชัย มั่นคง</span>
-                            </li>
-                            <li class="participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors" data-page="2">
-                                <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">20</span>
-                                <span class="participant-name text-gray-900">นางสาวนิตยา สุขสำราญ</span>
-                            </li>
-                        </ol>
+                        <!-- รายชื่อ - render จาก API -->
+                        <ol class="participants-list space-y-2 mb-4 hidden" id="participantsList"></ol>
                         
                         <!-- Pagination Controls -->
-                        <div class="pagination-controls flex items-center justify-center gap-2 mb-4">
+                        <div class="pagination-controls flex items-center justify-center gap-2 mb-4 hidden" id="paginationControls">
                             <button id="prevPageBtn" class="pagination-btn px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
                                 <i class="fas fa-chevron-left"></i>
                             </button>
                             <span class="text-sm text-gray-600">
-                                <span id="currentPage">1</span> / <span id="totalPages">2</span>
+                                <span id="currentPage">1</span> / <span id="totalPages">1</span>
                             </span>
                             <button id="nextPageBtn" class="pagination-btn px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                                 <i class="fas fa-chevron-right"></i>
                             </button>
                         </div>
                         
-                        <!-- Note: ข้อมูลเชิงสรุป (static information) -->
+                        <!-- Note: ข้อมูลเชิงสรุป -->
                         <p class="info-note text-xs text-gray-500 flex items-center gap-2 pt-3 border-t border-gray-200">
-                            <i class="fas fa-info-circle text-blue-600"></i>
-                            ข้อมูลสรุปการประชุม
+                            <i class="fas fa-bolt text-blue-600"></i>
+                            WebSocket Real-time
+                            <span id="connectionStatus" class="text-xs font-medium text-green-600"></span>
                         </p>
                     </div>
                 </div>
@@ -316,68 +299,820 @@
         </div>
     </footer>
     
+    <!-- Modal: เปลี่ยนหัวข้อการประชุม -->
+    <div id="changeMeetingModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <!-- Backdrop -->
+        <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onclick="closeChangeMeetingModal()"></div>
+        
+        <!-- Modal Content -->
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 transform transition-all">
+                <!-- Header -->
+                <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-edit text-blue-600"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900">เปลี่ยนหัวข้อการประชุม</h3>
+                    </div>
+                    <button onclick="closeChangeMeetingModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Form -->
+                <form id="changeMeetingForm" onsubmit="saveMeetingTitle(event)">
+                    <div class="mb-6">
+                        <label for="meetingTitle" class="block text-sm font-medium text-gray-700 mb-2">
+                            หัวข้อการประชุมใหม่
+                        </label>
+                        <input type="text" 
+                               id="meetingTitle" 
+                               name="meetingTitle"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                               placeholder="กรอกหัวข้อการประชุม..."
+                               required>
+                    </div>
+                    
+                    <!-- Buttons -->
+                    <div class="flex gap-3 justify-end">
+                        <button type="button" 
+                                onclick="closeChangeMeetingModal()"
+                                class="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">
+                            ยกเลิก
+                        </button>
+                        <button type="submit"
+                                class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
+                            <i class="fas fa-save"></i>
+                            <span>บันทึก</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: จัดการฐานข้อมูลวาระการประชุม (Recommendation) -->
+    <div id="recManagerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="backdrop-filter:blur(4px)">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+                <h3 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-database text-indigo-600"></i>
+                    จัดการฐานข้อมูลวาระการประชุม (Recommendation)
+                </h3>
+                <button onclick="closeRecManagerModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <!-- Add New Recommendation Form -->
+                <div class="bg-gray-50 rounded-lg p-5 border border-gray-200">
+                    <h4 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <i class="fas fa-plus-circle text-green-600"></i>
+                        เพิ่มวาระการประชุมใหม่
+                    </h4>
+                    <form id="addRecForm" class="space-y-4" onsubmit="addRecommendation(event)">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อวาระ <span class="text-red-500">*</span></label>
+                                <input type="text" id="recTitle" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="เช่น ร่าง พ.ร.บ. การศึกษาแห่งชาติ">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่ <span class="text-red-500">*</span></label>
+                                <select id="recCategory" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="">-- เลือกหมวดหมู่ --</option>
+                                    <option value="การศึกษา">การศึกษา</option>
+                                    <option value="เศรษฐกิจ">เศรษฐกิจ</option>
+                                    <option value="การเมือง">การเมือง</option>
+                                    <option value="สังคม">สังคม</option>
+                                    <option value="สาธารณสุข">สาธารณสุข</option>
+                                    <option value="เกษตรกรรม">เกษตรกรรม</option>
+                                    <option value="กฎหมาย">กฎหมาย</option>
+                                    <option value="คมนาคม">คมนาคม</option>
+                                    <option value="พลังงาน">พลังงาน</option>
+                                    <option value="สื่อสารและเทคโนโลยี">สื่อสารและเทคโนโลยี</option>
+                                    <option value="สิ่งแวดล้อม">สิ่งแวดล้อม</option>
+                                    <option value="การต่างประเทศ">การต่างประเทศ</option>
+                                    <option value="ท่องเที่ยว">ท่องเที่ยว</option>
+                                    <option value="กีฬา">กีฬา</option>
+                                    <option value="แรงงาน">แรงงาน</option>
+                                    <option value="มหาดไทย">มหาดไทย</option>
+                                    <option value="การเงิน/งบประมาณ">การเงิน/งบประมาณ</option>
+                                    <option value="โครงการ/แผนงาน">โครงการ/แผนงาน</option>
+                                    <option value="เทคโนโลยี/ระบบ/ข้อมูล">เทคโนโลยี/ระบบ/ข้อมูล</option>
+                                    <option value="นโยบาย/กฎระเบียบ/กฎหมาย">นโยบาย/กฎระเบียบ/กฎหมาย</option>
+                                    <option value="สถานที่/โครงสร้างพื้นฐาน">สถานที่/โครงสร้างพื้นฐาน</option>
+                                    <option value="วิจัย/นวัตกรรม">วิจัย/นวัตกรรม</option>
+                                    <option value="ความร่วมมือ/ภายนอก">ความร่วมมือ/ภายนอก</option>
+                                    <option value="ปัญหา/ความเสี่ยง/การแก้ไข">ปัญหา/ความเสี่ยง/การแก้ไข</option>
+                                    <option value="อื่นๆ">อื่นๆ</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">รายละเอียด</label>
+                            <textarea id="recDescription" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="คำอธิบายเพิ่มเติม (ไม่บังคับ)"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ไฟล์ PDF</label>
+                            <input type="file" id="recPdfFile" accept=".pdf" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                        </div>
+                        <button type="submit" class="w-full px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors">
+                            <i class="fas fa-save"></i>
+                            บันทึกวาระการประชุม
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Existing Recommendations List -->
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="font-bold text-gray-900 flex items-center gap-2">
+                            <i class="fas fa-list text-blue-600"></i>
+                            รายการวาระทั้งหมด
+                            <span id="recTotalCount" class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">0</span>
+                        </h4>
+                        <button onclick="resetRecDb()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                            <i class="fas fa-trash-alt"></i>
+                            ลบทั้งหมด
+                        </button>
+                    </div>
+                    <div id="recListContainer" class="space-y-2 max-h-80 overflow-y-auto">
+                        <p class="text-gray-500 text-center py-4">กำลังโหลด...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: PDF Viewer -->
+    <div id="pdfViewerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="backdrop-filter:blur(4px)">
+        <div class="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[95vh] flex flex-col">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <div>
+                    <h3 id="pdfViewerTitle" class="text-lg font-bold text-gray-900">รายละเอียดเอกสาร</h3>
+                    <p id="pdfViewerMeta" class="text-sm text-gray-500"></p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a id="pdfDownloadLink" href="#" target="_blank" class="hidden px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium items-center gap-1 transition-colors">
+                        <i class="fas fa-download"></i> ดาวน์โหลด
+                    </a>
+                    <button onclick="closePdfViewerModal()" class="text-gray-400 hover:text-gray-600 p-1">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="pdfViewerContent" class="flex-1 p-4 overflow-y-auto" style="min-height:300px;"></div>
+        </div>
+    </div>
+
     <!-- JavaScript -->
     <script>
         // Set current year
         document.getElementById('currentYear').textContent = new Date().getFullYear();
         
-        // Pagination functionality
-        (function() {
-            const itemsPerPage = 10;
-            let currentPage = 1;
-            const totalItems = 20;
-            const totalPages = Math.ceil(totalItems / itemsPerPage);
+        // ============================================
+        // Real-time Clock Functions
+        // ============================================
+        const thaiMonths = [
+            'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 
+            'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม',
+            'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+        ];
+        
+        const thaiDays = [
+            'อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 
+            'พฤหัสบดี', 'ศุกร์', 'เสาร์'
+        ];
+        
+        function updateClock() {
+            const now = new Date();
+            const dayName = thaiDays[now.getDay()];
+            const day = now.getDate();
+            const month = thaiMonths[now.getMonth()];
+            const year = now.getFullYear() + 543;
             
-            const participantsList = document.getElementById('participantsList');
-            const participantItems = participantsList.querySelectorAll('.participant-item');
-            const currentPageSpan = document.getElementById('currentPage');
-            const totalPagesSpan = document.getElementById('totalPages');
-            const prevBtn = document.getElementById('prevPageBtn');
-            const nextBtn = document.getElementById('nextPageBtn');
+            const dateStr = `วัน${dayName}ที่ ${day} ${month} ${year}`;
             
-            // Set total pages
-            totalPagesSpan.textContent = totalPages;
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const timeStr = `${hours}:${minutes}:${seconds} น.`;
             
-            function showPage(page) {
-                // Hide all items
-                participantItems.forEach(item => {
-                    item.style.display = 'none';
-                });
+            document.getElementById('currentDate').textContent = dateStr;
+            document.getElementById('currentTime').textContent = timeStr;
+        }
+        
+        updateClock();
+        setInterval(updateClock, 1000);
+        
+        // ============================================
+        // Settings Dropdown Functions
+        // ============================================
+        function toggleSettingsMenu() {
+            const menu = document.getElementById('settingsMenu');
+            menu.classList.toggle('hidden');
+        }
+        
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('settingsDropdown');
+            const menu = document.getElementById('settingsMenu');
+            if (dropdown && !dropdown.contains(event.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+        
+        // ============================================
+        // Change Meeting Title Modal Functions
+        // ============================================
+        function openChangeMeetingModal() {
+            const modal = document.getElementById('changeMeetingModal');
+            const menu = document.getElementById('settingsMenu');
+            const input = document.getElementById('meetingTitle');
+            
+            menu.classList.add('hidden');
+            
+            const currentTitle = document.querySelector('.header-box-right .header-title').textContent;
+            input.value = currentTitle;
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => input.focus(), 100);
+        }
+        
+        function closeChangeMeetingModal() {
+            document.getElementById('changeMeetingModal').classList.add('hidden');
+        }
+        
+        function saveMeetingTitle(event) {
+            event.preventDefault();
+            const newTitle = document.getElementById('meetingTitle').value.trim();
+            if (newTitle) {
+                document.querySelector('.header-box-right .header-title').textContent = newTitle;
+                showNotification('บันทึกหัวข้อการประชุมเรียบร้อยแล้ว', 'success');
+                closeChangeMeetingModal();
+            }
+        }
+        
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeChangeMeetingModal();
+                closeRecManagerModal();
+                closePdfViewerModal();
+            }
+        });
+        
+        // ============================================
+        // Recommendation Manager Modal Functions
+        // ============================================
+        const REC_API_BASE = 'http://localhost:5002';
+        
+        function openRecManagerModal() {
+            document.getElementById('settingsMenu').classList.add('hidden');
+            document.getElementById('recManagerModal').classList.remove('hidden');
+            loadRecList();
+        }
+        
+        function closeRecManagerModal() {
+            document.getElementById('recManagerModal').classList.add('hidden');
+        }
+        
+        function closePdfViewerModal() {
+            document.getElementById('pdfViewerModal').classList.add('hidden');
+        }
+        
+        document.getElementById('recManagerModal').addEventListener('click', function(e) {
+            if (e.target === this) closeRecManagerModal();
+        });
+        
+        document.getElementById('pdfViewerModal').addEventListener('click', function(e) {
+            if (e.target === this) closePdfViewerModal();
+        });
+        
+        async function loadRecList() {
+            const container = document.getElementById('recListContainer');
+            const countEl = document.getElementById('recTotalCount');
+            
+            try {
+                const response = await fetch(`${REC_API_BASE}/api/recommendations`);
+                const result = await response.json();
                 
-                // Show items for current page
-                participantItems.forEach(item => {
-                    const itemPage = parseInt(item.getAttribute('data-page'));
-                    if (itemPage === page) {
-                        item.style.display = 'flex';
-                    }
-                });
+                if (!result.success) {
+                    container.innerHTML = '<p class="text-red-500 text-center py-4">โหลดข้อมูลไม่สำเร็จ</p>';
+                    return;
+                }
                 
-                // Update current page display
-                currentPageSpan.textContent = page;
+                const recs = result.data;
+                countEl.textContent = recs.length;
                 
-                // Update button states
-                prevBtn.disabled = (page === 1);
-                nextBtn.disabled = (page === totalPages);
+                if (recs.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-8">ยังไม่มีข้อมูล กรุณาเพิ่มวาระการประชุม</p>';
+                    return;
+                }
+                
+                container.innerHTML = recs.map(rec => {
+                    const date = rec.created_at ? new Date(rec.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+                    const size = rec.pdf_size ? `${(rec.pdf_size / (1024 * 1024)).toFixed(2)} MB` : '';
+                    return `
+                        <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                            <div class="flex items-center gap-3 flex-1 min-w-0">
+                                <div class="w-9 h-9 rounded-lg flex items-center justify-center ${rec.pdf_stored_name ? 'bg-red-50' : 'bg-gray-100'} flex-shrink-0">
+                                    <i class="fas ${rec.pdf_stored_name ? 'fa-file-pdf text-red-500' : 'fa-file text-gray-400'}"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-medium text-gray-900 text-sm truncate">${escapeHtml(rec.title)}</p>
+                                    <div class="flex items-center gap-2 text-xs text-gray-500">
+                                        <span class="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded font-medium">${escapeHtml(rec.category)}</span>
+                                        <span>${date}</span>
+                                        ${size ? `<span>${size}</span>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1 flex-shrink-0">
+                                <button onclick="openEditRec(${rec.id})" class="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="แก้ไข">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                ${rec.pdf_stored_name ? `
+                                    <button onclick="viewRecDetail(${rec.id})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="ดูเอกสาร">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                ` : ''}
+                                <button onclick="deleteRec(${rec.id})" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบ">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Load rec list error:', error);
+                container.innerHTML = '<p class="text-red-500 text-center py-4">ไม่สามารถเชื่อมต่อกับระบบ Recommendation ได้</p>';
+            }
+        }
+        
+        async function addRecommendation(event) {
+            event.preventDefault();
+            
+            const title = document.getElementById('recTitle').value.trim();
+            const category = document.getElementById('recCategory').value;
+            const description = document.getElementById('recDescription').value.trim();
+            const pdfFile = document.getElementById('recPdfFile').files[0];
+            
+            if (!title || !category) {
+                showNotification('กรุณากรอกชื่อวาระและเลือกหมวดหมู่', 'error');
+                return;
             }
             
-            // Event listeners
-            prevBtn.addEventListener('click', () => {
-                if (currentPage > 1) {
-                    currentPage--;
-                    showPage(currentPage);
-                }
-            });
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('category', category);
+            formData.append('description', description);
+            if (pdfFile) {
+                formData.append('pdf_file', pdfFile);
+            }
             
-            nextBtn.addEventListener('click', () => {
-                if (currentPage < totalPages) {
-                    currentPage++;
-                    showPage(currentPage);
+            try {
+                const response = await fetch(`${REC_API_BASE}/api/recommendation`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('addRecForm').reset();
+                    loadRecList();
+                    showNotification('บันทึกวาระการประชุมสำเร็จ', 'success');
+                } else {
+                    showNotification('เกิดข้อผิดพลาด: ' + (result.error || 'ไม่สามารถบันทึกได้'), 'error');
                 }
-            });
+            } catch (error) {
+                console.error('Add rec error:', error);
+                showNotification('ไม่สามารถเชื่อมต่อกับระบบ Recommendation ได้', 'error');
+            }
+        }
+        
+        async function deleteRec(recId) {
+            if (!confirm('ต้องการลบวาระนี้ใช่หรือไม่?')) return;
             
-            // Initialize - show first page
-            showPage(1);
-        })();
+            try {
+                const response = await fetch(`${REC_API_BASE}/api/recommendation/${recId}`, { method: 'DELETE' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    loadRecList();
+                    showNotification('ลบวาระเรียบร้อยแล้ว', 'success');
+                } else {
+                    showNotification('ไม่สามารถลบได้: ' + (result.error || ''), 'error');
+                }
+            } catch (error) {
+                console.error('Delete rec error:', error);
+                showNotification('ไม่สามารถเชื่อมต่อกับระบบ Recommendation ได้', 'error');
+            }
+        }
+        
+        async function openEditRec(recId) {
+            try {
+                const response = await fetch(`${REC_API_BASE}/api/recommendation/${recId}`);
+                const result = await response.json();
+                if (!result.success) { showNotification('ไม่พบข้อมูล', 'error'); return; }
+                const rec = result.data;
+
+                let modal = document.getElementById('editRecModal');
+                if (!modal) {
+                    modal = document.createElement('div');
+                    modal.id = 'editRecModal';
+                    modal.className = 'hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4';
+                    modal.style.backdropFilter = 'blur(4px)';
+                    modal.innerHTML = `
+                        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+                                <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                    <i class="fas fa-edit text-amber-600"></i> แก้ไขวาระการประชุม
+                                </h3>
+                                <button onclick="document.getElementById('editRecModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                                    <i class="fas fa-times text-xl"></i>
+                                </button>
+                            </div>
+                            <div class="p-6">
+                                <form id="editRecForm" class="space-y-4">
+                                    <input type="hidden" id="editRecId">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อวาระ <span class="text-red-500">*</span></label>
+                                        <input type="text" id="editRecTitle" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่ <span class="text-red-500">*</span></label>
+                                        <select id="editRecCategory" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                                            <option value="">-- เลือกหมวดหมู่ --</option>
+                                            <option value="การศึกษา">การศึกษา</option>
+                                            <option value="เศรษฐกิจ">เศรษฐกิจ</option>
+                                            <option value="การเมือง">การเมือง</option>
+                                            <option value="สังคม">สังคม</option>
+                                            <option value="สาธารณสุข">สาธารณสุข</option>
+                                            <option value="เกษตรกรรม">เกษตรกรรม</option>
+                                            <option value="กฎหมาย">กฎหมาย</option>
+                                            <option value="คมนาคม">คมนาคม</option>
+                                            <option value="พลังงาน">พลังงาน</option>
+                                            <option value="สื่อสารและเทคโนโลยี">สื่อสารและเทคโนโลยี</option>
+                                            <option value="สิ่งแวดล้อม">สิ่งแวดล้อม</option>
+                                            <option value="การต่างประเทศ">การต่างประเทศ</option>
+                                            <option value="ท่องเที่ยว">ท่องเที่ยว</option>
+                                            <option value="กีฬา">กีฬา</option>
+                                            <option value="แรงงาน">แรงงาน</option>
+                                            <option value="มหาดไทย">มหาดไทย</option>
+                                            <option value="การเงิน/งบประมาณ">การเงิน/งบประมาณ</option>
+                                            <option value="โครงการ/แผนงาน">โครงการ/แผนงาน</option>
+                                            <option value="เทคโนโลยี/ระบบ/ข้อมูล">เทคโนโลยี/ระบบ/ข้อมูล</option>
+                                            <option value="นโยบาย/กฎระเบียบ/กฎหมาย">นโยบาย/กฎระเบียบ/กฎหมาย</option>
+                                            <option value="สถานที่/โครงสร้างพื้นฐาน">สถานที่/โครงสร้างพื้นฐาน</option>
+                                            <option value="วิจัย/นวัตกรรม">วิจัย/นวัตกรรม</option>
+                                            <option value="ความร่วมมือ/ภายนอก">ความร่วมมือ/ภายนอก</option>
+                                            <option value="ปัญหา/ความเสี่ยง/การแก้ไข">ปัญหา/ความเสี่ยง/การแก้ไข</option>
+                                            <option value="อื่นๆ">อื่นๆ</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">รายละเอียด</label>
+                                        <textarea id="editRecDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500" placeholder="คำอธิบายเพิ่มเติม"></textarea>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">เปลี่ยนไฟล์ PDF (ไม่บังคับ)</label>
+                                        <p id="editRecCurrentFile" class="text-xs text-gray-500 mb-1"></p>
+                                        <input type="file" id="editRecPdfFile" accept=".pdf" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100">
+                                    </div>
+                                    <div class="flex gap-3 justify-end pt-2">
+                                        <button type="button" onclick="document.getElementById('editRecModal').classList.add('hidden')" class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">ยกเลิก</button>
+                                        <button type="submit" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
+                                            <i class="fas fa-save"></i> บันทึก
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(modal);
+                    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+                    document.getElementById('editRecForm').addEventListener('submit', (e) => { e.preventDefault(); saveEditRec(); });
+                }
+
+                document.getElementById('editRecId').value = rec.id;
+                document.getElementById('editRecTitle').value = rec.title || '';
+                document.getElementById('editRecCategory').value = rec.category || '';
+                document.getElementById('editRecDescription').value = rec.description || '';
+                document.getElementById('editRecPdfFile').value = '';
+                document.getElementById('editRecCurrentFile').textContent = rec.pdf_filename ? `ไฟล์ปัจจุบัน: ${rec.pdf_filename}` : 'ยังไม่มีไฟล์ PDF';
+
+                modal.classList.remove('hidden');
+            } catch (error) {
+                console.error('Open edit rec error:', error);
+                showNotification('เกิดข้อผิดพลาดในการโหลดข้อมูล', 'error');
+            }
+        }
+        
+        async function saveEditRec() {
+            const recId = document.getElementById('editRecId').value;
+            const title = document.getElementById('editRecTitle').value.trim();
+            const category = document.getElementById('editRecCategory').value;
+            const description = document.getElementById('editRecDescription').value.trim();
+            const pdfFile = document.getElementById('editRecPdfFile').files[0];
+
+            if (!title || !category) {
+                showNotification('กรุณากรอกชื่อวาระและเลือกหมวดหมู่', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('category', category);
+            formData.append('description', description);
+            if (pdfFile) formData.append('pdf_file', pdfFile);
+
+            try {
+                const response = await fetch(`${REC_API_BASE}/api/recommendation/${recId}`, {
+                    method: 'PUT',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('editRecModal').classList.add('hidden');
+                    loadRecList();
+                    showNotification('อัปเดตวาระเรียบร้อยแล้ว', 'success');
+                } else {
+                    showNotification('เกิดข้อผิดพลาด: ' + (result.error || ''), 'error');
+                }
+            } catch (error) {
+                console.error('Save edit rec error:', error);
+                showNotification('ไม่สามารถเชื่อมต่อกับระบบ Recommendation ได้', 'error');
+            }
+        }
+
+        async function resetRecDb() {
+            if (!confirm('ต้องการรีเซ็ตฐานข้อมูล Recommendation ทั้งหมดใช่หรือไม่?\n\nข้อมูลและไฟล์ PDF ทั้งหมดจะถูกลบ!')) return;
+            
+            try {
+                const response = await fetch(`${REC_API_BASE}/api/recommendations/reset`, { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    loadRecList();
+                    showNotification('รีเซ็ตฐานข้อมูล Recommendation สำเร็จ', 'success');
+                } else {
+                    showNotification('เกิดข้อผิดพลาด: ' + (result.error || ''), 'error');
+                }
+            } catch (error) {
+                console.error('Reset rec error:', error);
+                showNotification('ไม่สามารถเชื่อมต่อกับระบบ Recommendation ได้', 'error');
+            }
+        }
+        
+        async function viewRecDetail(recId) {
+            const modal = document.getElementById('pdfViewerModal');
+            const titleEl = document.getElementById('pdfViewerTitle');
+            const metaEl = document.getElementById('pdfViewerMeta');
+            const contentEl = document.getElementById('pdfViewerContent');
+            const downloadLink = document.getElementById('pdfDownloadLink');
+            
+            modal.classList.remove('hidden');
+            contentEl.innerHTML = '<div class="flex items-center justify-center h-full py-12"><div class="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div></div>';
+            
+            try {
+                const response = await fetch(`${REC_API_BASE}/api/recommendation/${recId}`);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    contentEl.innerHTML = '<p class="text-red-500 text-center py-8">ไม่พบข้อมูล</p>';
+                    return;
+                }
+                
+                const rec = result.data;
+                titleEl.textContent = rec.title;
+                
+                const date = rec.created_at ? new Date(rec.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-';
+                metaEl.textContent = `หมวดหมู่: ${rec.category} | วันที่: ${date}`;
+                
+                if (rec.pdf_stored_name) {
+                    const pdfUrl = `${REC_API_BASE}/uploads/recommendations/${rec.pdf_stored_name}`;
+                    downloadLink.href = pdfUrl;
+                    downloadLink.classList.remove('hidden');
+                    downloadLink.style.display = 'flex';
+                    
+                    contentEl.innerHTML = `
+                        <div class="w-full h-full flex flex-col">
+                            <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                    <div><span class="text-gray-500">ชื่อวาระ:</span><br><strong>${escapeHtml(rec.title)}</strong></div>
+                                    <div><span class="text-gray-500">หมวดหมู่:</span><br><span class="inline-flex px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">${escapeHtml(rec.category)}</span></div>
+                                    <div><span class="text-gray-500">ไฟล์:</span><br><strong>${escapeHtml(rec.pdf_filename || '-')}</strong></div>
+                                    <div><span class="text-gray-500">ขนาด:</span><br><strong>${rec.pdf_size ? (rec.pdf_size / (1024*1024)).toFixed(2) + ' MB' : '-'}</strong></div>
+                                </div>
+                                ${rec.description ? `<div class="mt-3 pt-3 border-t border-gray-200"><span class="text-gray-500 text-sm">รายละเอียด:</span><p class="text-gray-900 mt-1">${escapeHtml(rec.description)}</p></div>` : ''}
+                            </div>
+                            <iframe src="${pdfUrl}" class="flex-1 w-full rounded-lg border border-gray-200" style="min-height: 500px;" title="PDF Viewer"></iframe>
+                        </div>
+                    `;
+                } else {
+                    downloadLink.classList.add('hidden');
+                    contentEl.innerHTML = `
+                        <div class="bg-gray-50 rounded-lg p-6">
+                            <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+                                <div><span class="text-gray-500">ชื่อวาระ:</span><br><strong class="text-lg">${escapeHtml(rec.title)}</strong></div>
+                                <div><span class="text-gray-500">หมวดหมู่:</span><br><span class="inline-flex px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded font-medium">${escapeHtml(rec.category)}</span></div>
+                            </div>
+                            ${rec.description ? `<div class="mt-3 pt-3 border-t border-gray-200"><span class="text-gray-500">รายละเอียด:</span><p class="text-gray-900 mt-2">${escapeHtml(rec.description)}</p></div>` : ''}
+                            <div class="mt-4 text-center text-gray-400"><i class="fas fa-file-circle-xmark text-3xl mb-2"></i><p>ไม่มีไฟล์ PDF แนบ</p></div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('View rec detail error:', error);
+                contentEl.innerHTML = '<p class="text-red-500 text-center py-8">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
+            }
+        }
+        
+        // ============================================
+        // Notification Function
+        // ============================================
+        function showNotification(message, type = 'success') {
+            const existing = document.querySelector('.notification-toast');
+            if (existing) existing.remove();
+            
+            const notification = document.createElement('div');
+            notification.className = 'notification-toast fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in';
+            
+            if (type === 'success') {
+                notification.classList.add('bg-green-600', 'text-white');
+                notification.innerHTML = `<i class="fas fa-check-circle"></i><span>${message}</span>`;
+            } else {
+                notification.classList.add('bg-red-600', 'text-white');
+                notification.innerHTML = `<i class="fas fa-exclamation-circle"></i><span>${message}</span>`;
+            }
+            
+            document.body.appendChild(notification);
+            setTimeout(() => {
+                notification.classList.add('animate-slide-out');
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        // ============================================
+        // Attendance - WebSocket Real-time
+        // ============================================
+        const ITEMS_PER_PAGE = 10;
+        let attendeesData = [];
+        let attendeesCurrentPage = 1;
+        let attendeesTotalPages = 1;
+
+        const listEl         = document.getElementById('participantsList');
+        const loadingEl      = document.getElementById('participantsLoading');
+        const errorEl        = document.getElementById('participantsError');
+        const paginationEl   = document.getElementById('paginationControls');
+        const currentPageEl  = document.getElementById('currentPage');
+        const totalPagesEl   = document.getElementById('totalPages');
+        const prevBtn        = document.getElementById('prevPageBtn');
+        const nextBtn        = document.getElementById('nextPageBtn');
+        const presentCountEl = document.getElementById('presentCount');
+        const absentCountEl  = document.getElementById('absentCount');
+        const pollingDot     = document.getElementById('pollingIndicator');
+        const connStatusEl   = document.getElementById('connectionStatus');
+
+        // ============================================
+        // Socket.IO Connection
+        // ============================================
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log('WebSocket connected:', socket.id);
+            pollingDot.style.backgroundColor = '#22c55e';
+            connStatusEl.textContent = 'เชื่อมต่อแล้ว';
+            connStatusEl.className = 'text-xs font-medium text-green-600';
+        });
+
+        socket.on('disconnect', () => {
+            console.log('WebSocket disconnected');
+            pollingDot.style.backgroundColor = '#ef4444';
+            connStatusEl.textContent = 'ขาดการเชื่อมต่อ';
+            connStatusEl.className = 'text-xs font-medium text-red-500';
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('WebSocket connection error:', err);
+            pollingDot.style.backgroundColor = '#ef4444';
+            connStatusEl.textContent = 'เชื่อมต่อไม่ได้';
+            connStatusEl.className = 'text-xs font-medium text-red-500';
+            if (attendeesData.length === 0) {
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+            }
+        });
+
+        // รับข้อมูลจาก server (ทั้ง initial load และ update)
+        socket.on('attendance_updated', (data) => {
+            if (!data.success) return;
+
+            pollingDot.classList.add('polling-active');
+
+            attendeesData = data.participants;
+            attendeesTotalPages = Math.ceil(attendeesData.length / ITEMS_PER_PAGE);
+            if (attendeesCurrentPage > attendeesTotalPages) attendeesCurrentPage = 1;
+
+            presentCountEl.textContent = data.summary.present;
+            absentCountEl.textContent  = data.summary.absent;
+
+            renderAttendees();
+
+            loadingEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+            listEl.classList.remove('hidden');
+            paginationEl.classList.remove('hidden');
+
+            setTimeout(() => pollingDot.classList.remove('polling-active'), 500);
+        });
+
+        socket.on('error', (data) => {
+            console.error('Server error:', data.message);
+        });
+
+        // ============================================
+        // Render & Interaction
+        // ============================================
+        function renderAttendees() {
+            listEl.innerHTML = '';
+
+            const start = (attendeesCurrentPage - 1) * ITEMS_PER_PAGE;
+            const end   = Math.min(start + ITEMS_PER_PAGE, attendeesData.length);
+            const pageItems = attendeesData.slice(start, end);
+
+            pageItems.forEach((p, idx) => {
+                const globalIdx = start + idx + 1;
+                const isPresent = p.status === 'เข้า';
+
+                const li = document.createElement('li');
+                li.className = 'participant-item flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors';
+                li.setAttribute('data-id', p.user_id);
+
+                li.innerHTML = `
+                    <span class="participant-number flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg font-semibold text-sm">${globalIdx}</span>
+                    <div class="flex-1 min-w-0">
+                        <span class="participant-name text-gray-900 block truncate">${escapeHtml(p.name)}</span>
+                        <span class="text-xs text-gray-400 block truncate">${escapeHtml(p.department || '')}</span>
+                    </div>
+                    <span class="status-badge ${isPresent ? 'status-present' : 'status-absent'}" title="คลิกเพื่อเปลี่ยนสถานะ" onclick="toggleStatus(${p.user_id}, '${p.status}')">
+                        <i class="fas ${isPresent ? 'fa-check-circle' : 'fa-times-circle'}"></i>
+                        ${isPresent ? 'เข้า' : 'ออก'}
+                    </span>
+                `;
+                listEl.appendChild(li);
+            });
+
+            currentPageEl.textContent = attendeesCurrentPage;
+            totalPagesEl.textContent  = attendeesTotalPages;
+            prevBtn.disabled = (attendeesCurrentPage === 1);
+            nextBtn.disabled = (attendeesCurrentPage >= attendeesTotalPages);
+        }
+
+        async function toggleStatus(id, currentStatus) {
+            const newStatus = currentStatus === 'เข้า' ? 'ออก' : 'เข้า';
+            try {
+                const res = await fetch(`/api/attendees/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showNotification(`อัพเดทสถานะเป็น "${newStatus}" เรียบร้อย`, 'success');
+                } else {
+                    showNotification(data.error || 'เกิดข้อผิดพลาด', 'error');
+                }
+            } catch (err) {
+                showNotification('ไม่สามารถอัพเดทสถานะได้', 'error');
+            }
+        }
+
+        function fetchAttendees() {
+            socket.emit('request_refresh');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Pagination event listeners
+        prevBtn.addEventListener('click', () => {
+            if (attendeesCurrentPage > 1) {
+                attendeesCurrentPage--;
+                renderAttendees();
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            if (attendeesCurrentPage < attendeesTotalPages) {
+                attendeesCurrentPage++;
+                renderAttendees();
+            }
+        });
     </script>
 </body>
 </html>

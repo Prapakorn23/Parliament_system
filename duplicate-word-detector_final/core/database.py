@@ -229,12 +229,22 @@ class DatabaseManager:
             
             # ไม่สร้างตาราง pos_frequencies - POS tags เก็บใน word_frequencies.pos_tag แล้ว
             
-            # ไม่สร้างตารางต่อไปนี้ - ยังไม่มีการใช้งาน:
-            # - topics, topic_analyses
-            # - parliament_sessions, session_aggregated_data
-            # - monthly_aggregated_data
-            # - time_series_models, predictions
-            # - notification_settings, notifications
+            # สร้างตาราง recommendations สำหรับเก็บเอกสารวาระการประชุม
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS `recommendations` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    `title` VARCHAR(500) NOT NULL COMMENT 'ชื่อวาระการประชุม',
+                    `category` VARCHAR(200) NOT NULL COMMENT 'หมวดหมู่ เช่น การศึกษา, เศรษฐกิจ',
+                    `description` TEXT NULL COMMENT 'รายละเอียดเพิ่มเติม',
+                    `pdf_filename` VARCHAR(500) NULL COMMENT 'ชื่อไฟล์ PDF ต้นฉบับ',
+                    `pdf_stored_name` VARCHAR(500) NULL COMMENT 'ชื่อไฟล์ที่เก็บจริงใน uploads/',
+                    `pdf_size` BIGINT NULL COMMENT 'ขนาดไฟล์ (bytes)',
+                    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX `idx_rec_category` (`category`),
+                    INDEX `idx_rec_created_at` (`created_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
             
             conn.commit()
             print("✅ Database tables created successfully")
@@ -450,10 +460,219 @@ class DatabaseManager:
         finally:
             cursor.close()
             conn.close()
-    
-    # Methods ที่เกี่ยวข้องกับ parliament_sessions และ session_aggregated_data ถูกลบออกแล้ว
-    # เพราะตารางเหล่านี้ถูกลบออกจาก schema (ยังไม่มีการใช้งาน)
 
+    def get_all_analyses_with_date(self):
+        """ดึง id และ created_at ของ analyses ทั้งหมด"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute("""
+                SELECT `id`, `created_at`
+                FROM `analyses`
+                ORDER BY `created_at`
+            """)
+            rows = cursor.fetchall()
+            return rows  # DictCursor คืน dict อยู่แล้ว
+        finally:
+            cursor.close()
+            conn.close()
+
+    def get_category_distribution(self, analysis_id: int) -> Dict[str, int]:
+        """ดึง total_frequency ของแต่ละหมวดหมู่"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute("""
+                SELECT `category_name`, `total_frequency`
+                FROM `categories`
+                WHERE `analysis_id` = %s
+            """, (analysis_id,))
+            
+            rows = cursor.fetchall()
+            return {row['category_name']: row['total_frequency'] for row in rows}
+        finally:
+            cursor.close()
+            conn.close()
+    
+    def get_word_frequencies(self, analysis_id: int):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT `word`, `frequency`
+                FROM `word_frequencies`
+                WHERE `analysis_id` = %s
+            """, (analysis_id,))
+            rows = cursor.fetchall()
+            return {row['word']: row['frequency'] for row in rows}
+        finally:
+            cursor.close()
+            conn.close()
+    def get_all_analysis_ids(self) -> List[int]:
+        """ดึง analysis_id ทั้งหมด"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT `id` FROM `analyses` ORDER BY `id`")
+            rows = cursor.fetchall()
+            return [row['id'] for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+
+    # ============ CRUD Operations สำหรับ recommendations ============
+
+    def create_recommendation(self, data: Dict) -> int:
+        """สร้าง recommendation ใหม่"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO `recommendations` (
+                    `title`, `category`, `description`,
+                    `pdf_filename`, `pdf_stored_name`, `pdf_size`
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                data['title'],
+                data['category'],
+                data.get('description'),
+                data.get('pdf_filename'),
+                data.get('pdf_stored_name'),
+                data.get('pdf_size')
+            ))
+            rec_id = cursor.lastrowid
+            conn.commit()
+            return rec_id
+        except Exception as e:
+            conn.rollback()
+            print(f"Error creating recommendation: {e}")
+            raise
+        finally:
+            cursor.close()
+            conn.close()
+
+    def get_recommendation(self, rec_id: int) -> Optional[Dict]:
+        """ดึง recommendation ตาม ID"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT * FROM `recommendations` WHERE `id` = %s", (rec_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            cursor.close()
+            conn.close()
+
+    def get_recommendations_by_category(self, category: str) -> List[Dict]:
+        """ดึง recommendations ตามหมวดหมู่"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT * FROM `recommendations`
+                WHERE `category` = %s
+                ORDER BY `created_at` DESC
+            """, (category,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+
+    def get_all_recommendations(self, limit: int = 100) -> List[Dict]:
+        """ดึง recommendations ทั้งหมด"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT * FROM `recommendations`
+                ORDER BY `created_at` DESC
+                LIMIT %s
+            """, (limit,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+
+    def get_recommendation_categories(self) -> List[Dict]:
+        """ดึงรายการหมวดหมู่ทั้งหมดพร้อมจำนวนเอกสาร"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT `category`, COUNT(*) as doc_count
+                FROM `recommendations`
+                GROUP BY `category`
+                ORDER BY doc_count DESC
+            """)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            cursor.close()
+            conn.close()
+
+    def update_recommendation(self, rec_id: int, data: Dict) -> bool:
+        """อัปเดต recommendation ตาม ID"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            fields = []
+            values = []
+            for key in ('title', 'category', 'description', 'pdf_filename', 'pdf_stored_name', 'pdf_size'):
+                if key in data:
+                    fields.append(f"`{key}` = %s")
+                    values.append(data[key])
+            if not fields:
+                return False
+            values.append(rec_id)
+            sql = f"UPDATE `recommendations` SET {', '.join(fields)} WHERE `id` = %s"
+            cursor.execute(sql, tuple(values))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            print(f"Error updating recommendation: {e}")
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+
+    def delete_recommendation(self, rec_id: int) -> bool:
+        """ลบ recommendation ตาม ID"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM `recommendations` WHERE `id` = %s", (rec_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            print(f"Error deleting recommendation: {e}")
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+
+    def reset_recommendations(self):
+        """ลบข้อมูลทั้งหมดในตาราง recommendations"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM `recommendations`")
+            cursor.execute("ALTER TABLE `recommendations` AUTO_INCREMENT = 1")
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            print(f"Error resetting recommendations: {e}")
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+   
 
 # Singleton pattern สำหรับ DatabaseManager
 _db_manager_instance = None
@@ -464,3 +683,4 @@ def get_db_manager() -> DatabaseManager:
     if _db_manager_instance is None:
         _db_manager_instance = DatabaseManager()
     return _db_manager_instance
+

@@ -26,6 +26,7 @@ venv.bak/
 # ============================================
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 *~
@@ -107,19 +108,9 @@ cache/
 temp_uploads/
 
 # ============================================
-# Sub-projects Specific
+# Sub-projects Specific (redundant rules removed,
+# generic patterns above already match at all levels)
 # ============================================
-# PDF2Text
-pdf2text_final/uploads/
-pdf2text_final/instance/
-pdf2text_final/__pycache__/
-pdf2text_final/**/__pycache__/
-
-# Duplicate Word Detector
-duplicate-word-detector_final/uploads/
-duplicate-word-detector_final/cache/
-duplicate-word-detector_final/__pycache__/
-duplicate-word-detector_final/**/__pycache__/
 
 # ============================================
 # Testing
@@ -130,8 +121,6 @@ htmlcov/
 .tox/
 .hypothesis/
 *.cover
-.hypothesis/
-.pytest_cache/
 
 # ============================================
 # Documentation Build
@@ -209,8 +198,9 @@ dmypy.json
 # Cache files
 *.cache
 
-# Session files
-flask_session/
-
 # Local configuration
 local_config.py
+
+# Runtime / Generated
+*.pid
+*.seed

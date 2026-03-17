@@ -15,6 +15,7 @@ class WordFrequencyAnalyzer {
     async init() {
         await this.loadUploadConfig();
         this.setupEventListeners();
+        this.setupRecManagerEvents();
     }
 
     async loadUploadConfig() {
@@ -92,25 +93,40 @@ class WordFrequencyAnalyzer {
         // File Upload - Drag and Drop
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
-        
-        uploadArea.addEventListener('click', () => fileInput.click());
-        
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('border-blue-500', 'bg-blue-50');
+        let dragCounter = 0;
+
+        uploadArea.addEventListener('click', (e) => {
+            if (!e.target.closest('button')) fileInput.click();
         });
 
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('border-blue-500', 'bg-blue-50');
+        uploadArea.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            uploadArea.classList.add('border-blue-500', 'bg-blue-50', 'scale-[1.01]');
+            uploadArea.querySelector('i.fa-cloud-upload-alt')?.classList.add('text-blue-500');
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        uploadArea.addEventListener('dragleave', (e) => {
+            dragCounter--;
+            if (dragCounter === 0) {
+                uploadArea.classList.remove('border-blue-500', 'bg-blue-50', 'scale-[1.01]');
+                uploadArea.querySelector('i.fa-cloud-upload-alt')?.classList.remove('text-blue-500');
+            }
         });
 
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadArea.classList.remove('border-blue-500', 'bg-blue-50');
+            e.stopPropagation();
+            dragCounter = 0;
+            uploadArea.classList.remove('border-blue-500', 'bg-blue-50', 'scale-[1.01]');
+            uploadArea.querySelector('i.fa-cloud-upload-alt')?.classList.remove('text-blue-500');
             const files = e.dataTransfer.files;
             if (files.length > 0) {
-                fileInput.files = files;
-                this.handleFileUpload({ target: fileInput });
+                this.handleFileUpload({ target: { files } });
             }
         });
         
@@ -365,7 +381,7 @@ class WordFrequencyAnalyzer {
             try {
                 const formData = new FormData();
                 filesToUpload.forEach((file, index) => {
-                    formData.append('files', file); // ใช้ 'files' (plural) และ append หลายไฟล์
+                    formData.append('files', file);
                 });
                 
                 this.updateProgress(30, 'กำลังแปลงไฟล์...');
@@ -378,12 +394,16 @@ class WordFrequencyAnalyzer {
                 const result = await response.json();
                 
                 if (result.success) {
-                    // รวมข้อความจากไฟล์ที่อัปโหลด
-                    const uploadedTexts = result.data.map(item => item.content || '').join('\n\n');
+                    // ตรวจสอบไฟล์ที่แปลงไม่สำเร็จ
+                    const failedFiles = result.data.filter(item => !item.success);
+                    const successFiles = result.data.filter(item => item.success);
+                    
+                    // รวมข้อความจากไฟล์ที่แปลงสำเร็จเท่านั้น
+                    const uploadedTexts = successFiles.map(item => item.content || '').join('\n\n');
                     allTextContent += uploadedTexts;
                     
-                    // เก็บข้อมูลไฟล์ (ใช้ไฟล์แรกถ้ามีหลายไฟล์)
-                    const firstFile = result.data.find(item => item.success);
+                    // เก็บข้อมูลไฟล์ (ใช้ไฟล์แรกที่สำเร็จ)
+                    const firstFile = successFiles[0];
                     const fileInfo = firstFile ? {
                         file_name: firstFile.filename,
                         file_type: firstFile.file_type,
@@ -396,18 +416,34 @@ class WordFrequencyAnalyzer {
                     // วิเคราะห์ข้อความรวม
                     if (allTextContent.trim()) {
                         document.getElementById('textInput').value = allTextContent;
-                        // วิเคราะห์ข้อความรวมพร้อมข้อมูลไฟล์
+                        
+                        if (failedFiles.length > 0) {
+                            const failedNames = failedFiles.map(f => f.filename).join(', ');
+                            console.warn(`ไฟล์ที่แปลงไม่สำเร็จ: ${failedNames}`);
+                        }
+                        
                         await this.analyzeTextContent(allTextContent, fileInfo);
                     } else {
-                        throw new Error('ไม่พบข้อความในไฟล์ที่อัปโหลด');
+                        // ไม่พบข้อความ - สร้าง error message ที่ละเอียด
+                        let errorMsg = 'ไม่พบข้อความในไฟล์ที่อัปโหลด\n\n';
+                        if (failedFiles.length > 0) {
+                            errorMsg += 'ไฟล์ที่ไม่สามารถแปลงได้:\n';
+                            failedFiles.forEach(f => {
+                                errorMsg += `• ${f.filename}: ${f.error || 'ไม่ทราบสาเหตุ'}\n`;
+                            });
+                            errorMsg += '\nหมายเหตุ: ไฟล์ PDF ที่เป็นภาพ (Scanned PDF) จำเป็นต้องมีระบบ OCR ที่พร้อมใช้งาน';
+                        }
+                        throw new Error(errorMsg);
                     }
                 } else {
                     throw new Error(result.error || 'ไม่สามารถแปลงไฟล์ได้');
                 }
             } catch (error) {
                 this.hideProgress();
+                document.getElementById('inputSection').classList.remove('hidden');
                 this.updateStepIndicator(1);
-                alert('เกิดข้อผิดพลาด: ' + error.message);
+                const msg = error.message;
+                setTimeout(() => alert('เกิดข้อผิดพลาด: ' + msg), 100);
             }
         } else if (allTextContent.trim()) {
             // มีเฉพาะไฟล์ TXT
@@ -456,6 +492,7 @@ class WordFrequencyAnalyzer {
                 this.updateProgress(100, 'เสร็จสิ้น!');
                 setTimeout(() => {
                     this.currentAnalysisData = result.data;
+                    this.currentAnalysisId = result.analysis_id;
                     this.displayResults(result.data);
                 }, 500);
             } else {
@@ -463,8 +500,10 @@ class WordFrequencyAnalyzer {
             }
         } catch (error) {
             this.hideProgress();
+            document.getElementById('inputSection').classList.remove('hidden');
             this.updateStepIndicator(1);
-            alert('เกิดข้อผิดพลาดในการวิเคราะห์: ' + error.message);
+            const msg = error.message;
+            setTimeout(() => alert('เกิดข้อผิดพลาดในการวิเคราะห์: ' + msg), 100);
         }
     }
 
@@ -500,17 +539,22 @@ class WordFrequencyAnalyzer {
                 this.updateProgress(100, 'เสร็จสิ้น!');
                 setTimeout(() => {
                     this.currentAnalysisData = result.data;
+                    this.currentAnalysisId = result.analysis_id;
                     this.displayResults(result.data);
                 }, 500);
             } else {
                 this.hideProgress();
+                document.getElementById('inputSection').classList.remove('hidden');
                 this.updateStepIndicator(1);
-                alert('เกิดข้อผิดพลาด: ' + (result.error || 'ไม่สามารถวิเคราะห์ได้'));
+                const msg = result.error || 'ไม่สามารถวิเคราะห์ได้';
+                setTimeout(() => alert('เกิดข้อผิดพลาด: ' + msg), 100);
             }
         } catch (error) {
             this.hideProgress();
+            document.getElementById('inputSection').classList.remove('hidden');
             this.updateStepIndicator(1);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            const msg = error.message;
+            setTimeout(() => alert('เกิดข้อผิดพลาด: ' + msg), 100);
         }
     }
 
@@ -563,6 +607,8 @@ class WordFrequencyAnalyzer {
                 block: 'start' 
             });
         }, 200);
+        this.loadRecommendations(this.currentAnalysisId);
+        this.loadTrendData();
     }
 
     animateNumber(elementId, start, end, duration) {
@@ -949,6 +995,14 @@ class WordFrequencyAnalyzer {
         document.getElementById('inputSection').classList.remove('hidden');
         document.getElementById('progressContainer').classList.add('hidden');
         
+        // Reset recommendation shortcut button
+        const jumpBtn = document.getElementById('jumpToRecBtn');
+        if (jumpBtn) jumpBtn.classList.add('hidden');
+        
+        // Reset recommendation panel highlight
+        const panel = document.getElementById('recommendationPanel');
+        if (panel) panel.classList.remove('ring-2', 'ring-indigo-400', 'ring-offset-2');
+        
         // Reset step indicator
         this.updateStepIndicator(1);
         
@@ -980,6 +1034,562 @@ class WordFrequencyAnalyzer {
 
     hideProgress() {
         document.getElementById('progressContainer').classList.add('hidden');
+    }
+    
+    async loadRecommendations(analysisId) {
+        const container = document.getElementById('recommendationContainer');
+        const badge = document.getElementById('matchedCategoryBadge');
+        const badgeName = document.getElementById('matchedCategoryName');
+
+        if (!this.currentAnalysisData || !this.currentAnalysisData.category_summary) {
+            container.innerHTML = '<p class="text-gray-500">ไม่พบข้อมูลหมวดหมู่</p>';
+            return;
+        }
+
+        const categorySummary = this.currentAnalysisData.category_summary;
+        if (!categorySummary || categorySummary.length === 0) {
+            container.innerHTML = '<p class="text-gray-500">ไม่พบข้อมูลหมวดหมู่จากการวิเคราะห์</p>';
+            return;
+        }
+
+        try {
+            container.innerHTML = '<div class="flex items-center justify-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-2 border-gray-200 border-t-indigo-600"></div><span class="ml-3 text-gray-500">กำลังค้นหาเอกสารที่เกี่ยวข้อง...</span></div>';
+
+            const response = await fetch('/api/recommendations/match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    category_summary: categorySummary
+                })
+            });
+
+            const result = await response.json();
+            console.log("RECOMMENDATION MATCH RESPONSE:", result);
+
+            if (result.matched_category) {
+                badge.classList.remove('hidden');
+                badgeName.textContent = result.matched_category;
+            } else {
+                badge.classList.add('hidden');
+            }
+
+            if (result.data && result.data.length > 0) {
+                const topCatInfo = result.top_category_info;
+                container.innerHTML = `
+                    ${topCatInfo ? `
+                        <div class="mb-4 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                            <p class="text-sm text-indigo-900">
+                                <i class="fas fa-chart-pie mr-1"></i>
+                                หมวดหมู่ <strong>"${result.matched_category}"</strong>
+                                มีคำที่พบ ${topCatInfo.unique_words} คำ (ความถี่รวม ${topCatInfo.total_frequency})
+                                — แสดงเอกสารที่เกี่ยวข้องจากหมวดหมู่นี้
+                            </p>
+                        </div>
+                    ` : ''}
+                    <div class="space-y-3">
+                        ${result.data.map(rec => `
+                            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer rec-card" data-rec-id="${rec.id}">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="flex items-start gap-3 flex-1 min-w-0">
+                                        <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${rec.pdf_stored_name ? 'bg-red-50' : 'bg-gray-100'}">
+                                            <i class="fas ${rec.pdf_stored_name ? 'fa-file-pdf text-red-500' : 'fa-file-alt text-gray-400'} text-lg"></i>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <h4 class="font-semibold text-gray-900 truncate">${rec.title}</h4>
+                                            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                                <span class="inline-flex items-center px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">
+                                                    <i class="fas fa-tag mr-1"></i>${rec.category}
+                                                </span>
+                                                ${rec.pdf_filename ? `<span class="text-xs text-gray-500"><i class="fas fa-paperclip mr-1"></i>${rec.pdf_filename}</span>` : ''}
+                                            </div>
+                                            ${rec.description ? `<p class="text-sm text-gray-600 mt-1 line-clamp-2">${rec.description}</p>` : ''}
+                                        </div>
+                                    </div>
+                                    <button class="flex-shrink-0 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium transition-colors" onclick="event.stopPropagation(); analyzer.viewRecDetail(${rec.id})">
+                                        <i class="fas fa-eye mr-1"></i>ดู
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <p class="text-xs text-gray-400 mt-3 text-center">พบ ${result.data.length} เอกสารในหมวดหมู่ "${result.matched_category}"</p>
+                `;
+
+                container.querySelectorAll('.rec-card').forEach(card => {
+                    card.addEventListener('click', () => {
+                        const recId = card.dataset.recId;
+                        this.viewRecDetail(parseInt(recId));
+                    });
+                });
+
+                // แสดงปุ่ม shortcut ที่ results header
+                const jumpBtn = document.getElementById('jumpToRecBtn');
+                const jumpLabel = document.getElementById('jumpToRecLabel');
+                if (jumpBtn) {
+                    jumpBtn.classList.remove('hidden');
+                    if (jumpLabel) jumpLabel.textContent = `ดูเอกสาร (${result.data.length})`;
+                    setTimeout(() => jumpBtn.classList.remove('animate-pulse'), 3000);
+                }
+
+                // Highlight recommendation panel แล้ว scroll ไป
+                const panel = document.getElementById('recommendationPanel');
+                if (panel) {
+                    panel.classList.add('ring-2', 'ring-indigo-400', 'ring-offset-2');
+                    setTimeout(() => {
+                        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        setTimeout(() => panel.classList.remove('ring-2', 'ring-indigo-400', 'ring-offset-2'), 3000);
+                    }, 1800);
+                }
+            } else {
+                const sorted = [...categorySummary]
+                    .filter(c => c.category !== 'อื่นๆ')
+                    .sort((a, b) => b.total_frequency - a.total_frequency);
+                const topCats = sorted.slice(0, 3).map(c => `"${c.category}" (${c.total_frequency})`).join(', ');
+
+                // ซ่อนปุ่ม shortcut
+                const jumpBtn = document.getElementById('jumpToRecBtn');
+                if (jumpBtn) jumpBtn.classList.add('hidden');
+
+                container.innerHTML = `
+                    <div class="text-center py-8">
+                        <i class="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
+                        <p class="text-gray-500">ไม่พบเอกสารในหมวดหมู่ "${result.matched_category || '-'}"</p>
+                        <p class="text-sm text-gray-400 mt-1">หมวดหมู่ที่พบมากที่สุด: ${topCats}</p>
+                        <p class="text-sm text-gray-400 mt-1">กรุณาเพิ่มเอกสารในฐานข้อมูล Recommendation เพื่อให้ระบบแนะนำได้</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Recommendation match error:', error);
+            container.innerHTML = '<p class="text-red-500">เกิดข้อผิดพลาดในการค้นหาเอกสาร</p>';
+        }
+    }
+
+    // ============ Recommendation Manager Functions ============
+
+    setupRecManagerEvents() {
+        const openBtn = document.getElementById('openRecManagerBtn');
+        const modal = document.getElementById('recManagerModal');
+        const closeBtn = document.getElementById('closeRecManager');
+        const form = document.getElementById('addRecForm');
+        const resetBtn = document.getElementById('resetRecDbBtn');
+
+        if (openBtn) {
+            openBtn.addEventListener('click', () => this.openRecManager());
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+        }
+
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.classList.add('hidden');
+            });
+        }
+
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.addRecommendation();
+            });
+        }
+
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => this.resetRecDb());
+        }
+
+        // PDF viewer
+        const pdfModal = document.getElementById('pdfViewerModal');
+        const closePdf = document.getElementById('closePdfViewer');
+
+        if (closePdf) {
+            closePdf.addEventListener('click', () => pdfModal.classList.add('hidden'));
+        }
+
+        if (pdfModal) {
+            pdfModal.addEventListener('click', (e) => {
+                if (e.target === pdfModal) pdfModal.classList.add('hidden');
+            });
+        }
+    }
+
+    openRecManager() {
+        document.getElementById('recManagerModal').classList.remove('hidden');
+        this.loadRecList();
+    }
+
+    async loadRecList() {
+        const container = document.getElementById('recListContainer');
+        const countEl = document.getElementById('recTotalCount');
+
+        try {
+            const response = await fetch('/api/recommendations');
+            const result = await response.json();
+
+            if (!result.success) {
+                container.innerHTML = '<p class="text-red-500 text-center py-4">โหลดข้อมูลไม่สำเร็จ</p>';
+                return;
+            }
+
+            const recs = result.data;
+            countEl.textContent = recs.length;
+
+            if (recs.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">ยังไม่มีข้อมูล กรุณาเพิ่มวาระการประชุม</p>';
+                return;
+            }
+
+            container.innerHTML = recs.map(rec => {
+                const date = rec.created_at ? new Date(rec.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+                const size = rec.pdf_size ? `${(rec.pdf_size / (1024 * 1024)).toFixed(2)} MB` : '';
+                return `
+                    <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center gap-3 flex-1 min-w-0">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center ${rec.pdf_stored_name ? 'bg-red-50' : 'bg-gray-100'} flex-shrink-0">
+                                <i class="fas ${rec.pdf_stored_name ? 'fa-file-pdf text-red-500' : 'fa-file text-gray-400'}"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-medium text-gray-900 text-sm truncate">${rec.title}</p>
+                                <div class="flex items-center gap-2 text-xs text-gray-500">
+                                    <span class="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded font-medium">${rec.category}</span>
+                                    <span>${date}</span>
+                                    ${size ? `<span>${size}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                            <button onclick="analyzer.openEditRec(${rec.id})" class="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="แก้ไข">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            ${rec.pdf_stored_name ? `
+                                <button onclick="analyzer.viewRecDetail(${rec.id})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="ดูเอกสาร">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            ` : ''}
+                            <button onclick="analyzer.deleteRec(${rec.id})" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบ">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Load rec list error:', error);
+            container.innerHTML = '<p class="text-red-500 text-center py-4">เกิดข้อผิดพลาด</p>';
+        }
+    }
+
+    async addRecommendation() {
+        const title = document.getElementById('recTitle').value.trim();
+        const category = document.getElementById('recCategory').value;
+        const description = document.getElementById('recDescription').value.trim();
+        const pdfFile = document.getElementById('recPdfFile').files[0];
+
+        if (!title || !category) {
+            alert('กรุณากรอกชื่อวาระและเลือกหมวดหมู่');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('category', category);
+        formData.append('description', description);
+        if (pdfFile) {
+            formData.append('pdf_file', pdfFile);
+        }
+
+        try {
+            const response = await fetch('/api/recommendation', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                document.getElementById('addRecForm').reset();
+                this.loadRecList();
+                alert('บันทึกสำเร็จ!');
+            } else {
+                alert('เกิดข้อผิดพลาด: ' + (result.error || 'ไม่สามารถบันทึกได้'));
+            }
+        } catch (error) {
+            console.error('Add rec error:', error);
+            alert('เกิดข้อผิดพลาดในการบันทึก');
+        }
+    }
+
+    async deleteRec(recId) {
+        if (!confirm('ต้องการลบวาระนี้ใช่หรือไม่?')) return;
+
+        try {
+            const response = await fetch(`/api/recommendation/${recId}`, { method: 'DELETE' });
+            const result = await response.json();
+
+            if (result.success) {
+                this.loadRecList();
+            } else {
+                alert('ไม่สามารถลบได้: ' + (result.error || ''));
+            }
+        } catch (error) {
+            console.error('Delete rec error:', error);
+        }
+    }
+
+    async openEditRec(recId) {
+        try {
+            const response = await fetch(`/api/recommendation/${recId}`);
+            const result = await response.json();
+            if (!result.success) {
+                alert('ไม่พบข้อมูล');
+                return;
+            }
+            const rec = result.data;
+
+            let modal = document.getElementById('editRecModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'editRecModal';
+                modal.className = 'hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4';
+                modal.style.backdropFilter = 'blur(4px)';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                        <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+                            <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                <i class="fas fa-edit text-amber-600"></i>
+                                แก้ไขวาระการประชุม
+                            </h3>
+                            <button onclick="document.getElementById('editRecModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        <div class="p-6">
+                            <form id="editRecForm" class="space-y-4">
+                                <input type="hidden" id="editRecId">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อวาระ <span class="text-red-500">*</span></label>
+                                    <input type="text" id="editRecTitle" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่ <span class="text-red-500">*</span></label>
+                                    <select id="editRecCategory" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+                                        <option value="">-- เลือกหมวดหมู่ --</option>
+                                        <option value="การศึกษา">การศึกษา</option>
+                                        <option value="เศรษฐกิจ">เศรษฐกิจ</option>
+                                        <option value="การเมือง">การเมือง</option>
+                                        <option value="สังคม">สังคม</option>
+                                        <option value="สาธารณสุข">สาธารณสุข</option>
+                                        <option value="เกษตรกรรม">เกษตรกรรม</option>
+                                        <option value="กฎหมาย">กฎหมาย</option>
+                                        <option value="คมนาคม">คมนาคม</option>
+                                        <option value="พลังงาน">พลังงาน</option>
+                                        <option value="สื่อสารและเทคโนโลยี">สื่อสารและเทคโนโลยี</option>
+                                        <option value="สิ่งแวดล้อม">สิ่งแวดล้อม</option>
+                                        <option value="การต่างประเทศ">การต่างประเทศ</option>
+                                        <option value="ท่องเที่ยว">ท่องเที่ยว</option>
+                                        <option value="กีฬา">กีฬา</option>
+                                        <option value="แรงงาน">แรงงาน</option>
+                                        <option value="มหาดไทย">มหาดไทย</option>
+                                        <option value="การเงิน/งบประมาณ">การเงิน/งบประมาณ</option>
+                                        <option value="โครงการ/แผนงาน">โครงการ/แผนงาน</option>
+                                        <option value="เทคโนโลยี/ระบบ/ข้อมูล">เทคโนโลยี/ระบบ/ข้อมูล</option>
+                                        <option value="นโยบาย/กฎระเบียบ/กฎหมาย">นโยบาย/กฎระเบียบ/กฎหมาย</option>
+                                        <option value="สถานที่/โครงสร้างพื้นฐาน">สถานที่/โครงสร้างพื้นฐาน</option>
+                                        <option value="วิจัย/นวัตกรรม">วิจัย/นวัตกรรม</option>
+                                        <option value="ความร่วมมือ/ภายนอก">ความร่วมมือ/ภายนอก</option>
+                                        <option value="ปัญหา/ความเสี่ยง/การแก้ไข">ปัญหา/ความเสี่ยง/การแก้ไข</option>
+                                        <option value="อื่นๆ">อื่นๆ</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">รายละเอียด</label>
+                                    <textarea id="editRecDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500" placeholder="คำอธิบายเพิ่มเติม"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">เปลี่ยนไฟล์ PDF (ไม่บังคับ)</label>
+                                    <p id="editRecCurrentFile" class="text-xs text-gray-500 mb-1"></p>
+                                    <input type="file" id="editRecPdfFile" accept=".pdf" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100">
+                                </div>
+                                <div class="flex gap-3 justify-end pt-2">
+                                    <button type="button" onclick="document.getElementById('editRecModal').classList.add('hidden')" class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">ยกเลิก</button>
+                                    <button type="submit" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
+                                        <i class="fas fa-save"></i> บันทึก
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+
+                modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+                document.getElementById('editRecForm').addEventListener('submit', (e) => { e.preventDefault(); analyzer.saveEditRec(); });
+            }
+
+            document.getElementById('editRecId').value = rec.id;
+            document.getElementById('editRecTitle').value = rec.title || '';
+            document.getElementById('editRecCategory').value = rec.category || '';
+            document.getElementById('editRecDescription').value = rec.description || '';
+            document.getElementById('editRecPdfFile').value = '';
+            document.getElementById('editRecCurrentFile').textContent = rec.pdf_filename ? `ไฟล์ปัจจุบัน: ${rec.pdf_filename}` : 'ยังไม่มีไฟล์ PDF';
+
+            modal.classList.remove('hidden');
+        } catch (error) {
+            console.error('Open edit rec error:', error);
+            alert('เกิดข้อผิดพลาดในการโหลดข้อมูล');
+        }
+    }
+
+    async saveEditRec() {
+        const recId = document.getElementById('editRecId').value;
+        const title = document.getElementById('editRecTitle').value.trim();
+        const category = document.getElementById('editRecCategory').value;
+        const description = document.getElementById('editRecDescription').value.trim();
+        const pdfFile = document.getElementById('editRecPdfFile').files[0];
+
+        if (!title || !category) {
+            alert('กรุณากรอกชื่อวาระและเลือกหมวดหมู่');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('category', category);
+        formData.append('description', description);
+        if (pdfFile) {
+            formData.append('pdf_file', pdfFile);
+        }
+
+        try {
+            const response = await fetch(`/api/recommendation/${recId}`, {
+                method: 'PUT',
+                body: formData
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                document.getElementById('editRecModal').classList.add('hidden');
+                this.loadRecList();
+                alert('อัปเดตสำเร็จ!');
+            } else {
+                alert('เกิดข้อผิดพลาด: ' + (result.error || 'ไม่สามารถอัปเดตได้'));
+            }
+        } catch (error) {
+            console.error('Save edit rec error:', error);
+            alert('เกิดข้อผิดพลาดในการบันทึก');
+        }
+    }
+
+    async resetRecDb() {
+        if (!confirm('⚠️ ต้องการรีเซ็ตฐานข้อมูล Recommendation ทั้งหมดใช่หรือไม่?\n\nข้อมูลและไฟล์ PDF ทั้งหมดจะถูกลบ!')) return;
+
+        try {
+            const response = await fetch('/api/recommendations/reset', { method: 'POST' });
+            const result = await response.json();
+
+            if (result.success) {
+                this.loadRecList();
+                alert('รีเซ็ตฐานข้อมูล Recommendation สำเร็จ');
+            } else {
+                alert('เกิดข้อผิดพลาด: ' + (result.error || ''));
+            }
+        } catch (error) {
+            console.error('Reset rec error:', error);
+        }
+    }
+
+    async viewRecDetail(recId) {
+        const modal = document.getElementById('pdfViewerModal');
+        const titleEl = document.getElementById('pdfViewerTitle');
+        const metaEl = document.getElementById('pdfViewerMeta');
+        const contentEl = document.getElementById('pdfViewerContent');
+        const downloadLink = document.getElementById('pdfDownloadLink');
+
+        modal.classList.remove('hidden');
+        contentEl.innerHTML = '<div class="flex items-center justify-center h-full"><div class="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-indigo-600"></div></div>';
+
+        try {
+            const response = await fetch(`/api/recommendation/${recId}`);
+            const result = await response.json();
+
+            if (!result.success) {
+                contentEl.innerHTML = '<p class="text-red-500 text-center">ไม่พบข้อมูล</p>';
+                return;
+            }
+
+            const rec = result.data;
+            titleEl.textContent = rec.title;
+
+            const date = rec.created_at ? new Date(rec.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-';
+            metaEl.textContent = `หมวดหมู่: ${rec.category} | วันที่: ${date}`;
+
+            if (rec.pdf_stored_name) {
+                const pdfUrl = `/uploads/recommendations/${rec.pdf_stored_name}`;
+                downloadLink.href = pdfUrl;
+                downloadLink.classList.remove('hidden');
+                downloadLink.style.display = 'flex';
+
+                contentEl.innerHTML = `
+                    <div class="w-full h-full flex flex-col">
+                        <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                <div><span class="text-gray-500">ชื่อวาระ:</span><br><strong>${rec.title}</strong></div>
+                                <div><span class="text-gray-500">หมวดหมู่:</span><br><span class="inline-flex px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">${rec.category}</span></div>
+                                <div><span class="text-gray-500">ไฟล์:</span><br><strong>${rec.pdf_filename || '-'}</strong></div>
+                                <div><span class="text-gray-500">ขนาด:</span><br><strong>${rec.pdf_size ? (rec.pdf_size / (1024*1024)).toFixed(2) + ' MB' : '-'}</strong></div>
+                            </div>
+                            ${rec.description ? `<div class="mt-3 pt-3 border-t border-gray-200"><span class="text-gray-500 text-sm">รายละเอียด:</span><p class="text-gray-900 mt-1">${rec.description}</p></div>` : ''}
+                        </div>
+                        <iframe src="${pdfUrl}" class="flex-1 w-full rounded-lg border border-gray-200" style="min-height: 500px;" title="PDF Viewer"></iframe>
+                    </div>
+                `;
+            } else {
+                downloadLink.classList.add('hidden');
+                contentEl.innerHTML = `
+                    <div class="bg-gray-50 rounded-lg p-6">
+                        <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+                            <div><span class="text-gray-500">ชื่อวาระ:</span><br><strong class="text-lg">${rec.title}</strong></div>
+                            <div><span class="text-gray-500">หมวดหมู่:</span><br><span class="inline-flex px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded font-medium">${rec.category}</span></div>
+                        </div>
+                        ${rec.description ? `<div class="mt-3 pt-3 border-t border-gray-200"><span class="text-gray-500">รายละเอียด:</span><p class="text-gray-900 mt-2">${rec.description}</p></div>` : ''}
+                        <div class="mt-4 text-center text-gray-400"><i class="fas fa-file-circle-xmark text-3xl mb-2"></i><p>ไม่มีไฟล์ PDF แนบ</p></div>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('View rec detail error:', error);
+            contentEl.innerHTML = '<p class="text-red-500 text-center">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
+        }
+    }
+
+    async loadTrendData() {
+    try {
+        const response = await fetch('/api/trend/category');
+        const result = await response.json();
+        console.log("TREND RESPONSE:", result);
+
+        if (!result.trend) return;
+
+        const ctx = document.getElementById('trendChart');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: result.trend.map(item => item.date),
+                datasets: [{
+                    label: 'จำนวนการวิเคราะห์',
+                    data: result.trend.map(item => item.count),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,0.1)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+    }
     }
 }
 

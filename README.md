@@ -242,31 +242,61 @@ python app.py
 
 ## 🎯 ฟีเจอร์หลัก
 
-### 1. Header Section
-- แสดง 2 boxes: หัวข้อการประชุม และ การติดตามนโยบาย
-- Rounded boxes design
-- Hover effects
+### 1. Main Dashboard (port 5003)
+- **Real-time Attendance Tracking**: ติดตามสถานะผู้เข้าร่วมประชุมแบบเรียลไทม์ผ่าน WebSocket (Flask-SocketIO)
+- **Toggle สถานะ**: คลิกเปลี่ยนสถานะ เข้า/ออก ของผู้เข้าร่วมได้ทันที พร้อม broadcast ไปยังทุก client
+- **Pagination**: แบ่งหน้ารายชื่อ 10 คนต่อหน้า พร้อม Sticky position เมื่อ scroll
+- **Summary Badges**: แสดงจำนวนผู้เข้าร่วม/ไม่เข้าร่วมแบบ real-time
+- **Polling Indicator**: แสดงสถานะการเชื่อมต่อ (จุดสีเขียว/แดง)
+- **Thai Clock**: แสดงวันที่และเวลาภาษาไทยแบบ real-time
+- **Header Boxes**: แสดงหัวข้อการประชุม และการติดตามนโยบาย พร้อม hover effects
+- **Settings Dropdown**: 
+  - เปลี่ยนหัวข้อการประชุม
+  - จัดการฐานข้อมูลเอกสารแนะนำ (เพิ่ม/แก้ไข/ลบ/รีเซ็ต พร้อมดู PDF ใน iframe)
+- **Toast Notifications**: แจ้งเตือนการทำงานต่างๆ แบบ slide-in/out
+- **Database**: เชื่อมต่อ MySQL (meeting_attendance) ผ่าน PyMySQL
 
-### 2. รายชื่อผู้เข้าร่วมประชุม
-- แสดง 20 คน
-- Pagination: หน้าละ 10 คน
-- Sticky position
-- Hover effects
+### 2. Document Recommendation System (port 5001)
+- **รองรับหลายรูปแบบไฟล์**: PDF, DOCX, TXT, รูปภาพ (JPG/PNG/GIF/BMP/TIFF) ขนาดสูงสุด 50MB
+- **OCR (Optical Character Recognition)**: ใช้ Pytesseract แปลงรูปภาพและ Scanned PDF เป็นข้อความ รองรับทั้งภาษาไทยและอังกฤษ
+- **AI Summarization**: 
+  - ใช้ **Typhoon API** เป็นตัวหลักในการสรุปเนื้อหาอัตโนมัติ
+  - มี **Extractive Summarization** เป็น fallback (keyword scoring, sentence position)
+  - รองรับ **Hierarchical Summarization** สำหรับข้อความยาว (>10,000 ตัวอักษร)
+  - ตรวจจับภาษาอัตโนมัติ (ไทย/อังกฤษ)
+- **ค้นหาประวัติ**: ค้นหาเอกสารที่เคย extract พร้อม autocomplete suggestions และ popular tags
+- **ดาวน์โหลด**: ดาวน์โหลดข้อความที่ extract แล้ว, ไฟล์ต้นฉบับ, หรือสรุป
+- **Re-extract**: สามารถ extract ซ้ำจากไฟล์ที่เก็บไว้
+- **Memory Management**: จัดการ garbage collection อัตโนมัติเมื่อใช้หน่วยความจำเกิน 80%
 
-### 3. Document Recommendation System
-- Link ไปยัง PDF2Text system
-- แสดงรายการ features
-- Button เพื่อเข้าสู่ระบบ
+### 3. Trend Analysis & Duplicate Detection (port 5002)
+- **ตรวจจับคำซ้ำ**: 
+  - ใช้ **PyThaiNLP** สำหรับ tokenization และ POS tagging ภาษาไทย
+  - ตรวจจับ N-gram (bigrams/trigrams)
+  - จัดกลุ่มคำที่คล้ายกัน (similarity grouping)
+  - คำนวณคะแนนการซ้ำ (frequency, spread, length)
+  - มี Parliament-specific stopwords สำหรับกรองคำที่ไม่เกี่ยวข้อง
+- **วิเคราะห์แนวโน้ม**: 
+  - `TrendAnalysisEngine` วิเคราะห์แนวโน้มตามหมวดหมู่
+  - คำนวณ policy score (growth + z-score)
+  - จัดหมวดหมู่คำด้วย `ParliamentWordCategorizer`
+- **Hybrid Recommendation Engine**: 
+  - ใช้ scikit-learn คำนวณ cosine similarity บน keyword + category vectors
+  - จับคู่เอกสารแนะนำกับผลวิเคราะห์อัตโนมัติ
+- **จัดการเอกสารแนะนำ**: CRUD เต็มรูปแบบ (สร้าง/อ่าน/แก้ไข/ลบ) พร้อมแบ่งตามหมวดหมู่
+- **รองรับหลายไฟล์**: อัปโหลดหลายไฟล์พร้อมกัน (TXT, PDF, DOC, DOCX)
+- **Export**: ส่งออกผลวิเคราะห์เป็น JSON
 
-### 4. Trend Analysis
-- Link ไปยัง Duplicate Word Detector
-- แสดงคำอธิบาย
-- Button เพื่อดูรายละเอียด
+### 4. AI Monitor (Mockup)
+- Mockup UI สำหรับแสดงสถานะการทำงานของ AI services
+- ยังไม่มี backend connection (พร้อมสำหรับพัฒนาต่อในอนาคต)
 
-### 5. AI Monitor
-- Mockup UI เท่านั้น
-- แสดงสถานะ AI services
-- ไม่มี backend connection
+### 5. ระบบรวม (run_all.py)
+- รันทั้ง 3 services พร้อมกันด้วย script เดียว
+- ตรวจสอบ sub-project folders อัตโนมัติก่อนเริ่ม
+- เว้น 2 วินาทีระหว่างการเริ่มแต่ละ service
+- Graceful shutdown: กด Ctrl+C จะ terminate ก่อน → รอ 3 วินาที → kill ถ้าจำเป็น
+- แสดง URLs และ exit codes ของแต่ละ service
 
 ---
 
@@ -305,14 +335,22 @@ python app.py
 
 ### Technologies Used
 
-- **Backend**: Flask 3.0.0
+- **Backend**: 
+  - Flask 3.0.0 + Flask-SocketIO (WebSocket real-time)
+  - PyMySQL (MySQL database connector)
+  - Typhoon API (AI summarization)
+  - Pytesseract (OCR - Thai + English)
+  - PyThaiNLP (Thai NLP tokenization & POS tagging)
+  - scikit-learn (Cosine similarity, recommendation engine)
+  - pdfplumber, python-docx (Document parsing)
 - **Frontend**: 
-  - HTML5
-  - CSS3 (Custom)
+  - HTML5 + CSS3 (Custom)
   - Tailwind CSS (CDN)
-  - JavaScript (Vanilla)
+  - JavaScript (Vanilla) + Socket.IO client
+  - Chart.js (Data visualization)
 - **Icons**: Font Awesome 6.4.0
-- **Fonts**: Google Fonts (Sarabun)
+- **Fonts**: Google Fonts (Sarabun - Thai)
+- **Database**: MySQL (meeting_attendance, extraction_records, summary_records)
 
 ### Browser Support
 
@@ -325,6 +363,7 @@ python app.py
 
 - Lightweight: ใช้ CDN สำหรับ CSS framework
 - Fast loading: Minimal dependencies
+- Real-time: WebSocket สำหรับอัปเดตข้อมูลทันที
 - Responsive: ทำงานได้ดีบนทุกขนาดหน้าจอ
 
 ---

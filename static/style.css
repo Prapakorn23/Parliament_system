@@ -269,6 +269,112 @@ button:active:not(:disabled) {
 }
 
 /* ============================================
+   STATUS BADGE STYLES
+   สถานะ เข้า/ออก ของผู้เข้าประชุม
+   ============================================ */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.status-present {
+    background-color: #dcfce7;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+}
+
+.status-present:hover {
+    background-color: #bbf7d0;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+
+.status-absent {
+    background-color: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+.status-absent:hover {
+    background-color: #fecaca;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+/* ============================================
+   SUMMARY BADGES (เข้า/ออก count)
+   ============================================ */
+.summary-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.badge-present {
+    background-color: #dcfce7;
+    color: #16a34a;
+}
+
+.badge-absent {
+    background-color: #fee2e2;
+    color: #dc2626;
+}
+
+/* ============================================
+   POLLING INDICATOR (Real-time dot)
+   ============================================ */
+.polling-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #22c55e;
+    position: relative;
+}
+
+.polling-dot::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background-color: #22c55e;
+    animation: pollingPulse 2s ease-in-out infinite;
+}
+
+.polling-active {
+    background-color: #3b82f6;
+}
+
+.polling-active::after {
+    background-color: #3b82f6;
+}
+
+@keyframes pollingPulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.4;
+        transform: scale(1.8);
+    }
+}
+
+/* ============================================
    TREND STATS STYLES
    สถิติในกล่อง Trend
    ============================================ */
@@ -345,6 +451,80 @@ button:active:not(:disabled) {
     
     body {
         background: white;
+    }
+}
+
+/* ============================================
+   REAL-TIME CLOCK STYLES
+   ============================================ */
+.tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+
+#currentTime {
+    letter-spacing: 0.5px;
+}
+
+/* ============================================
+   NOTIFICATION TOAST STYLES
+   ============================================ */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+.animate-slide-in {
+    animation: slideIn 0.3s ease-out forwards;
+}
+
+.animate-slide-out {
+    animation: slideOut 0.3s ease-in forwards;
+}
+
+.notification-toast {
+    min-width: 280px;
+}
+
+/* ============================================
+   SETTINGS DROPDOWN STYLES
+   ============================================ */
+#settingsMenu {
+    animation: fadeIn 0.2s ease-out;
+}
+
+/* ============================================
+   MODAL STYLES
+   ============================================ */
+#changeMeetingModal > div:last-child > div {
+    animation: modalSlideUp 0.3s ease-out;
+}
+
+@keyframes modalSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
     }
 }
 

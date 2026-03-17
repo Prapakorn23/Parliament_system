@@ -152,3 +152,35 @@ header {
 #helpModal {
     z-index: 50;
 }
+
+/* Recommendation cards */
+.rec-card {
+    transition: all 0.2s ease;
+}
+
+.rec-card:hover {
+    transform: translateY(-1px);
+}
+
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Recommendation manager modal */
+#recManagerModal,
+#pdfViewerModal {
+    z-index: 60;
+}
+
+/* File input styling */
+input[type="file"]::file-selector-button {
+    cursor: pointer;
+}
+
+/* PDF iframe */
+#pdfViewerContent iframe {
+    border: none;
+}

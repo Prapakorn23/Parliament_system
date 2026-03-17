@@ -1,13 +1,19 @@
 """
-โมเดลตรวจจับคำซ้ำจากข้อความภาษาไทย
+โมเดลตรวจจับคำซ้ำจากข้อความภาษาไทย (Enhanced v2)
 ใช้ PyThaiNLP สำหรับการวิเคราะห์ Part-of-Speech และการนับความถี่ของคำ
-ปรับปรุงประสิทธิภาพด้วย caching และ parallel processing
+ปรับปรุงประสิทธิภาพด้วย:
+- Similarity-based word grouping (รวมคำที่คล้ายกัน)
+- N-gram phrase detection (ตรวจจับวลีซ้ำ)
+- Duplicate scoring & threshold (ให้คะแนนและจัดอันดับคำซ้ำ)
+- Enhanced preprocessing & stopwords
+- Caching และ parallel processing
 """
 
 import re
+import math
 import pandas as pd
 from collections import Counter, defaultdict
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Tuple, Optional, Any, Set
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 import plotly.graph_objects as go
@@ -24,221 +30,506 @@ from pythainlp.util import normalize
 
 # Import performance utilities
 from .performance_utils import (
-    PerformanceTracker, CacheManager, ParallelProcessor, 
+    PerformanceTracker, CacheManager, ParallelProcessor,
     timing_decorator, get_performance_summary
 )
 
 
+# --- Parliament-specific stopwords ---
+PARLIAMENT_STOPWORDS = {
+    'ที่', 'ของ', 'ใน', 'เป็น', 'และ', 'มี', 'ได้', 'จะ', 'ให้', 'กับ',
+    'จาก', 'โดย', 'แล้ว', 'ไม่', 'ว่า', 'ก็', 'ยัง', 'กัน', 'ซึ่ง', 'ด้วย',
+    'หรือ', 'อยู่', 'แต่', 'นั้น', 'นี้', 'ไป', 'มา', 'เพื่อ', 'ถึง', 'แม้',
+    'ทั้ง', 'เมื่อ', 'ต่อ', 'ตาม', 'ผ่าน', 'ขึ้น', 'ลง', 'ออก', 'คือ', 'อัน',
+    'บ้าง', 'ครับ', 'ค่ะ', 'ครั้ง', 'อีก', 'ทำ', 'เรา', 'ท่าน', 'เรียน',
+    'กราบเรียน', 'ประธาน', 'สมาชิก', 'ผม', 'ดิฉัน', 'ขอ', 'ขอบคุณ',
+    'เพราะ', 'เพราะว่า', 'ดัง', 'เช่น', 'อย่าง', 'เลย', 'ต้อง', 'ควร',
+    'อาจ', 'คง', 'น่า', 'แค่', 'เฉพาะ', 'ถ้า', 'หาก', 'แม้ว่า',
+    'ระหว่าง', 'ภายใน', 'ภายนอก', 'ข้าง', 'บน', 'ล่าง', 'หน้า', 'หลัง',
+    'ทุก', 'ทั้งหมด', 'บาง', 'หลาย', 'มาก', 'น้อย', 'เท่า', 'ประมาณ',
+    'ฉะนั้น', 'ดังนั้น', 'เพราะฉะนั้น', 'อย่างไรก็ตาม', 'อย่างไรก็ดี',
+    'สำหรับ', 'เกี่ยวกับ', 'เนื่องจาก', 'พร้อม', 'รวม', 'แยก',
+}
+
+
 class ThaiDuplicateWordDetector:
     """
-    คลาสสำหรับตรวจจับคำซ้ำในข้อความภาษาไทย
-    รองรับการกรองตาม Part-of-Speech และการวิเคราะห์ความถี่
-    ปรับปรุงประสิทธิภาพด้วย caching และ parallel processing
-    """
+    คลาสสำหรับตรวจจับคำซ้ำในข้อความภาษาไทย (Enhanced v2)
     
-    def __init__(self, tokenize_engine='long'):
-        """
-        เริ่มต้นโมเดล
-        
-        Args:
-            tokenize_engine (str): Engine สำหรับ tokenization
-                - 'newmm': เร็ว ดีสำหรับข้อความทั่วไป
-                - 'long': แยกวลียาวได้ดีกว่า (เช่น "การศึกษาขั้นพื้นฐาน" เป็นคำเดียว)
-                - 'deepcut': ใช้ deep learning (ต้องติดตั้ง deepcut)
-                - 'attacut': ใช้ transformer (ต้องติดตั้ง attacut)
-        """
-        self.stopwords = set(thai_stopwords())
+    คุณสมบัติใหม่:
+    - Similarity grouping: รวมคำที่เป็น substring ของกัน เช่น "การศึกษา" + "การศึกษาขั้นพื้นฐาน"
+    - N-gram detection: ตรวจจับวลีซ้ำ (bigram, trigram, 4-gram)
+    - Duplicate scoring: ให้คะแนนความสำคัญของคำซ้ำจาก frequency, spread, word length
+    - Threshold filtering: กำหนดขั้นต่ำของความถี่ที่จะถือว่าเป็น "คำซ้ำ"
+    - Enhanced stopwords: เพิ่ม stopwords สำหรับบริบทรัฐสภา
+    """
+
+    def __init__(self, tokenize_engine='long',
+                 duplicate_threshold=2,
+                 enable_ngram=True,
+                 ngram_min=2, ngram_max=4, ngram_min_freq=2,
+                 enable_similarity=True,
+                 similarity_threshold=0.6,
+                 score_weights=None):
+        self.stopwords = set(thai_stopwords()) | PARLIAMENT_STOPWORDS
         self.word_frequency = Counter()
         self.pos_frequency = defaultdict(Counter)
         self.processed_texts = []
         self.tokenize_engine = tokenize_engine
-        
-        # เพิ่มประสิทธิภาพ
+
+        # Enhanced detection settings
+        self.duplicate_threshold = duplicate_threshold
+        self.enable_ngram = enable_ngram
+        self.ngram_min = ngram_min
+        self.ngram_max = ngram_max
+        self.ngram_min_freq = ngram_min_freq
+        self.enable_similarity = enable_similarity
+        self.similarity_threshold = similarity_threshold
+        self.score_weights = score_weights or {
+            'frequency': 0.4, 'spread': 0.3, 'length': 0.3
+        }
+
         self.performance_tracker = PerformanceTracker()
         self.cache_manager = CacheManager()
         self.parallel_processor = ParallelProcessor()
         self._lock = threading.Lock()
-        
+
+    # ================================================================
+    # Preprocessing
+    # ================================================================
+
     @timing_decorator("preprocess_text")
     def preprocess_text(self, text: str) -> str:
-        """
-        ทำความสะอาดข้อความก่อนการประมวลผล
-        
-        Args:
-            text (str): ข้อความต้นฉบับ
-            
-        Returns:
-            str: ข้อความที่ทำความสะอาดแล้ว
-        """
-        # ตรวจสอบ cache ก่อน
+        """ทำความสะอาดข้อความก่อนการประมวลผล"""
         cache_key = f"preprocess_{hash(text)}"
         cached_result = self.cache_manager.get(cache_key)
         if cached_result is not None:
             return cached_result
-        
-        # ลบตัวอักษรพิเศษและตัวเลขที่ไม่จำเป็น (รองรับทั้งไทยและอังกฤษ)
-        text = re.sub(r'[^\u0E00-\u0E7F\u0041-\u005A\u0061-\u007A\s]', '', text)
-        
+
+        # Normalize Thai characters (sara am, repeated marks, etc.)
+        text = normalize(text)
+
+        # แทนที่เครื่องหมายขีดกลาง/ขีดล่างด้วยช่องว่าง เพื่อไม่สูญเสียข้อมูล
+        text = re.sub(r'[-_/\\]+', ' ', text)
+
+        # ลบตัวเลขที่อยู่โดดๆ แต่เก็บตัวเลขที่ติดกับตัวอักษร (เช่น "5G", "PM2.5")
+        text = re.sub(r'(?<![a-zA-Z\u0E00-\u0E7F])\d+(?![a-zA-Z\u0E00-\u0E7F])', '', text)
+
+        # ลบเครื่องหมายวรรคตอนและอักขระพิเศษ (เก็บไทย, อังกฤษ, ช่องว่าง)
+        text = re.sub(r'[^\u0E00-\u0E7Fa-zA-Z\s]', '', text)
+
         # ลบช่องว่างที่เกิน
         text = re.sub(r'\s+', ' ', text)
-        
-        # ปรับมาตรฐานข้อความ
-        text = normalize(text)
-        
+
         result = text.strip()
-        
-        # เก็บใน cache
         self.cache_manager.set(cache_key, result)
-        
         return result
-    
+
+    # ================================================================
+    # Tokenization & POS Tagging
+    # ================================================================
+
     @timing_decorator("tokenize_and_tag")
     def tokenize_and_tag(self, text: str) -> List[Tuple[str, str]]:
-        """
-        แยกคำและติดแท็ก Part-of-Speech
-        
-        Args:
-            text (str): ข้อความที่ต้องการประมวลผล
-            
-        Returns:
-            List[Tuple[str, str]]: รายการของ (คำ, POS tag)
-        """
-        # ตรวจสอบ cache ก่อน
+        """แยกคำและติดแท็ก Part-of-Speech"""
         cache_key = f"tokenize_{hash(text)}"
         cached_result = self.cache_manager.get(cache_key)
         if cached_result is not None:
             return cached_result
-        
-        # แยกคำ (รองรับทั้งไทยและอังกฤษ)
-        # ใช้ engine='long' เพื่อแยกวลียาวได้ดีกว่า (เช่น "การศึกษาขั้นพื้นฐาน", "กระทรวงศึกษาธิการ")
+
         try:
             tokens = word_tokenize(text, engine=self.tokenize_engine)
         except Exception as e:
-            # Fallback to newmm if the specified engine is not available
             print(f"Warning: Tokenize engine '{self.tokenize_engine}' not available, using 'newmm': {e}")
             tokens = word_tokenize(text, engine='newmm')
-        
-        # ติดแท็ก POS (รองรับทั้งไทยและอังกฤษ)
+
         pos_tags = pos_tag(tokens, engine='perceptron')
-        
-        # เพิ่มการรองรับภาษาอังกฤษและปรับปรุงการแยกคำ
+
         enhanced_pos_tags = []
         for token, pos in pos_tags:
-            # ถ้าเป็นคำภาษาอังกฤษ ให้กำหนด POS tag
-            if re.match(r'^[a-zA-Z]+$', token):
-                if len(token) > 3:
-                    enhanced_pos_tags.append((token, 'NCMN'))  # คำนาม
-                else:
-                    enhanced_pos_tags.append((token, 'VACT'))  # กริยา
-            # กรองอักขระพิเศษและตัวเลขที่แยกออกมาเป็นคำเดียว
-            elif re.match(r'^[^\u0E00-\u0E7F\u0041-\u005A\u0061-\u007A]+$', token):
-                # ข้ามอักขระพิเศษที่ไม่ใช่ตัวอักษร
+            token_stripped = token.strip()
+            if not token_stripped:
                 continue
-            # กรองคำสั้นเกินไป (1 ตัวอักษร) ที่ไม่ใช่คำสำคัญ
-            elif len(token) == 1 and pos not in ['NCMN', 'NOUN', 'VACT', 'VERB', 'PROP']:
+
+            if re.match(r'^[a-zA-Z]+$', token_stripped):
+                tag = 'NCMN' if len(token_stripped) > 3 else 'VACT'
+                enhanced_pos_tags.append((token_stripped.lower(), tag))
+            elif re.match(r'^[^\u0E00-\u0E7Fa-zA-Z]+$', token_stripped):
+                continue
+            elif len(token_stripped) == 1 and pos not in ['NCMN', 'NOUN', 'VACT', 'VERB', 'PROP']:
                 continue
             else:
-                enhanced_pos_tags.append((token, pos))
-        
-        # เก็บใน cache
+                enhanced_pos_tags.append((token_stripped, pos))
+
         self.cache_manager.set(cache_key, enhanced_pos_tags)
-        
         return enhanced_pos_tags
-    
-    def filter_by_pos(self, pos_tags: List[Tuple[str, str]], 
+
+    # ================================================================
+    # POS Filtering
+    # ================================================================
+
+    def filter_by_pos(self, pos_tags: List[Tuple[str, str]],
                       target_pos: List[str] = None) -> List[Tuple[str, str]]:
-        """
-        กรองคำตาม Part-of-Speech
-        
-        Args:
-            pos_tags (List[Tuple[str, str]]): รายการของ (คำ, POS tag)
-            target_pos (List[str]): รายการ POS tags ที่ต้องการ
-            
-        Returns:
-            List[Tuple[str, str]]: คำที่กรองแล้ว
-        """
+        """กรองคำตาม Part-of-Speech พร้อม enhanced stopwords"""
         if target_pos is None:
-            # กรองเฉพาะคำนามและกริยา
-            target_pos = ['NOUN', 'VERB', 'NCMN', 'VACT', 'VSTA']
-        
+            target_pos = ['NOUN', 'VERB', 'NCMN', 'VACT', 'VSTA', 'PROP', 'ADJ', 'ADVN']
+
         filtered = []
         for word, pos in pos_tags:
-            # กรองคำหยุดและคำสั้น
-            # ปรับปรุง: ยอมรับคำที่ยาวกว่า 2 ตัวอักษร หรือเป็นคำสำคัญแม้สั้น
-            is_important_word = len(word) > 2 or any(tag in pos for tag in ['NCMN', 'NOUN', 'VACT', 'VERB', 'PROP'])
-            
-            if (word not in self.stopwords and 
-                is_important_word and 
-                any(tag in pos for tag in target_pos)):
+            if word in self.stopwords:
+                continue
+
+            is_important = (
+                len(word) > 2
+                or pos in ('NCMN', 'NOUN', 'VACT', 'VERB', 'PROP')
+            )
+            if is_important and any(tag in pos for tag in target_pos):
                 filtered.append((word, pos))
-        
+
         return filtered
-    
-    def analyze_text(self, text: str, 
-                    filter_pos: bool = True,
-                    target_pos: List[str] = None,
-                    track_time: bool = True) -> Dict:
+
+    # ================================================================
+    # Word Normalization (ช่วย group คำรูปแบบต่างๆ)
+    # ================================================================
+
+    @staticmethod
+    def _normalize_word(word: str) -> str:
+        """ลด variation ของคำให้เป็นรูปมาตรฐาน"""
+        w = word.strip()
+        w = re.sub(r'[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]+', '', w)  # strip vowels & tone marks for comparison
+        return w.lower()
+
+    # ================================================================
+    # Similarity Grouping
+    # ================================================================
+
+    def _group_similar_words(self, word_counts: Counter) -> Dict[str, Dict]:
         """
-        วิเคราะห์ข้อความและนับความถี่ของคำ
+        รวมกลุ่มคำที่มีลักษณะคล้ายกัน:
+        1. Substring match: "การศึกษา" ⊂ "การศึกษาขั้นพื้นฐาน"
+        2. Normalized match: คำที่ต่างกันแค่สระ/วรรณยุกต์
         
-        Args:
-            text (str): ข้อความที่ต้องการวิเคราะห์
-            filter_pos (bool): ต้องการกรองตาม POS หรือไม่
-            target_pos (List[str]): รายการ POS tags ที่ต้องการ
-            track_time (bool): ต้องการติดตามเวลาหรือไม่
-            
-        Returns:
-            Dict: ผลการวิเคราะห์
+        Returns dict ที่ key = representative word, value = {
+            'members': [(word, freq), ...],
+            'total_frequency': int,
+            'representative': str
+        }
+        """
+        if not self.enable_similarity:
+            return {
+                w: {'members': [(w, c)], 'total_frequency': c, 'representative': w}
+                for w, c in word_counts.items()
+            }
+
+        words = sorted(word_counts.keys(), key=lambda w: (-word_counts[w], -len(w)))
+        assigned: Dict[str, str] = {}
+        groups: Dict[str, Dict] = {}
+
+        for word in words:
+            if word in assigned:
+                continue
+
+            group_key = word
+            groups[group_key] = {
+                'members': [(word, word_counts[word])],
+                'total_frequency': word_counts[word],
+                'representative': word
+            }
+            assigned[word] = group_key
+
+            for other in words:
+                if other in assigned or other == word:
+                    continue
+
+                sim = self._word_similarity(word, other)
+                if sim >= self.similarity_threshold:
+                    groups[group_key]['members'].append((other, word_counts[other]))
+                    groups[group_key]['total_frequency'] += word_counts[other]
+                    assigned[other] = group_key
+
+        return groups
+
+    def _word_similarity(self, a: str, b: str) -> float:
+        """
+        คำนวณความคล้ายกันระหว่างคำสองคำ (0.0 - 1.0)
+        ใช้ผสมระหว่าง substring match + character overlap
+        """
+        if a == b:
+            return 1.0
+
+        shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+
+        # Substring match (ถ้า shorter อยู่ใน longer ทั้งคำ)
+        if len(shorter) >= 3 and shorter in longer:
+            return len(shorter) / len(longer)
+
+        # Character-level Jaccard similarity
+        set_a = set(a)
+        set_b = set(b)
+        intersection = set_a & set_b
+        union = set_a | set_b
+        if not union:
+            return 0.0
+
+        jaccard = len(intersection) / len(union)
+
+        # Prefix bonus: คำที่ขึ้นต้นเหมือนกัน
+        common_prefix = 0
+        for ca, cb in zip(a, b):
+            if ca == cb:
+                common_prefix += 1
+            else:
+                break
+        prefix_ratio = common_prefix / max(len(a), len(b)) if max(len(a), len(b)) > 0 else 0
+
+        return 0.5 * jaccard + 0.5 * prefix_ratio
+
+    # ================================================================
+    # N-gram Phrase Detection
+    # ================================================================
+
+    def _detect_ngram_duplicates(self, tokens: List[str]) -> Dict[str, int]:
+        """
+        ตรวจจับวลีซ้ำ (n-gram) จาก token list
+        
+        Returns: dict ของ { "วลี": frequency } เฉพาะที่ frequency >= ngram_min_freq
+        """
+        if not self.enable_ngram:
+            return {}
+
+        ngram_counts: Counter = Counter()
+
+        for n in range(self.ngram_min, self.ngram_max + 1):
+            for i in range(len(tokens) - n + 1):
+                gram = tokens[i:i + n]
+                # กรองถ้า gram มีแต่ stopwords
+                meaningful = [w for w in gram if w not in self.stopwords and len(w) > 1]
+                if len(meaningful) < max(1, n // 2):
+                    continue
+                phrase = ' '.join(gram)
+                ngram_counts[phrase] += 1
+
+        return {
+            phrase: count
+            for phrase, count in ngram_counts.items()
+            if count >= self.ngram_min_freq
+        }
+
+    # ================================================================
+    # Duplicate Scoring
+    # ================================================================
+
+    def _calculate_duplicate_scores(self, word_counts: Counter,
+                                     token_positions: Dict[str, List[int]],
+                                     total_tokens: int) -> Dict[str, Dict]:
+        """
+        ให้คะแนนความสำคัญของคำซ้ำ โดยพิจารณาจาก:
+        - frequency: ความถี่สัมพัทธ์
+        - spread: การกระจายตัวในข้อความ (ซ้ำทั่วข้อความ vs กระจุกตัว)
+        - length: ความยาวของคำ (คำยาว = สำคัญกว่า)
+        """
+        if total_tokens == 0:
+            return {}
+
+        max_freq = max(word_counts.values()) if word_counts else 1
+        max_len = max((len(w) for w in word_counts), default=1)
+        scores = {}
+
+        for word, freq in word_counts.items():
+            if freq < self.duplicate_threshold:
+                continue
+
+            # Frequency score (normalized)
+            freq_score = freq / max_freq
+
+            # Spread score: วัดจาก standard deviation ของตำแหน่ง
+            positions = token_positions.get(word, [])
+            if len(positions) >= 2:
+                mean_pos = sum(positions) / len(positions)
+                variance = sum((p - mean_pos) ** 2 for p in positions) / len(positions)
+                std = math.sqrt(variance)
+                spread_score = min(1.0, std / (total_tokens / 2)) if total_tokens > 0 else 0
+            else:
+                spread_score = 0.0
+
+            # Length score (normalized)
+            length_score = len(word) / max_len
+
+            w = self.score_weights
+            composite = (
+                w['frequency'] * freq_score
+                + w['spread'] * spread_score
+                + w['length'] * length_score
+            )
+
+            scores[word] = {
+                'frequency': freq,
+                'score': round(composite, 4),
+                'freq_score': round(freq_score, 4),
+                'spread_score': round(spread_score, 4),
+                'length_score': round(length_score, 4),
+            }
+
+        return dict(sorted(scores.items(), key=lambda x: -x[1]['score']))
+
+    # ================================================================
+    # Main Analysis (Enhanced)
+    # ================================================================
+
+    def analyze_text(self, text: str,
+                     filter_pos: bool = True,
+                     target_pos: List[str] = None,
+                     track_time: bool = True) -> Dict:
+        """
+        วิเคราะห์ข้อความและนับความถี่ของคำ (Enhanced v2)
+        
+        ผลลัพธ์ใหม่ที่เพิ่มเข้ามา:
+        - duplicate_scores: คะแนนความสำคัญของคำซ้ำ
+        - similar_groups: กลุ่มคำที่คล้ายกัน
+        - ngram_duplicates: วลีซ้ำ (bigram, trigram, ...)
+        - flagged_duplicates: คำที่ frequency >= threshold
         """
         if track_time:
             self.performance_tracker.start_timing("analyze_text")
-        
-        # ทำความสะอาดข้อความ
+
         cleaned_text = self.preprocess_text(text)
-        
-        # แยกคำและติดแท็ก POS
         pos_tags = self.tokenize_and_tag(cleaned_text)
-        
-        # กรองตาม POS ถ้าต้องการ
+
         if filter_pos:
             pos_tags = self.filter_by_pos(pos_tags, target_pos)
-        
-        # นับความถี่ของคำ
+
+        # นับความถี่
         word_counts = Counter([word for word, pos in pos_tags])
-        
-        # นับความถี่ของ POS
         pos_counts = Counter([pos for word, pos in pos_tags])
-        
-        # บันทึกข้อมูล (ใช้ lock เพื่อความปลอดภัย)
+
+        # จัดเก็บตำแหน่งของแต่ละคำ (สำหรับ spread scoring)
+        token_positions: Dict[str, List[int]] = defaultdict(list)
+        for idx, (word, pos) in enumerate(pos_tags):
+            token_positions[word].append(idx)
+
+        total_tokens = len(pos_tags)
+
+        # --- Enhanced features ---
+
+        # 1. Duplicate scoring
+        duplicate_scores = self._calculate_duplicate_scores(
+            word_counts, token_positions, total_tokens
+        )
+
+        # 2. Similarity grouping
+        similar_groups = self._group_similar_words(word_counts)
+
+        # 3. N-gram detection
+        token_list = [word for word, pos in pos_tags]
+        ngram_duplicates = self._detect_ngram_duplicates(token_list)
+
+        # 4. Flagged duplicates (ผ่าน threshold)
+        flagged = {
+            w: c for w, c in word_counts.items()
+            if c >= self.duplicate_threshold
+        }
+
+        # บันทึกข้อมูล
         with self._lock:
             self.word_frequency.update(word_counts)
             for word, pos in pos_tags:
                 self.pos_frequency[word][pos] += 1
-            
+
             self.processed_texts.append({
                 'original_text': text,
                 'cleaned_text': cleaned_text,
                 'word_count': len(word_counts),
-                'total_words': len(pos_tags),
+                'total_words': total_tokens,
                 'word_frequency': word_counts,
                 'pos_frequency': pos_counts,
                 'filtered_words': pos_tags,
                 'analysis_time': time.time()
             })
-        
+
         result = {
+            # Original fields (backward-compatible)
             'word_frequency': word_counts,
             'pos_frequency': pos_counts,
-            'total_words': len(pos_tags),
+            'total_words': total_tokens,
             'unique_words': len(word_counts),
-            'filtered_words': pos_tags
+            'filtered_words': pos_tags,
+
+            # Enhanced fields
+            'duplicate_scores': duplicate_scores,
+            'similar_groups': {
+                k: {
+                    'members': v['members'],
+                    'total_frequency': v['total_frequency'],
+                    'representative': v['representative']
+                }
+                for k, v in similar_groups.items()
+                if v['total_frequency'] >= self.duplicate_threshold
+            },
+            'ngram_duplicates': dict(
+                sorted(ngram_duplicates.items(), key=lambda x: -x[1])[:50]
+            ),
+            'flagged_duplicates': flagged,
+            'duplicate_count': len(flagged),
+            'duplicate_threshold': self.duplicate_threshold,
         }
-        
+
         if track_time:
             duration = self.performance_tracker.end_timing("analyze_text")
             result['processing_time'] = duration
-        
+
         return result
+
+    # ================================================================
+    # Duplicate Report
+    # ================================================================
+
+    def get_duplicate_report(self, result: Dict, top_n: int = 20) -> Dict:
+        """
+        สร้างรายงานสรุปคำซ้ำอย่างละเอียด
+        
+        Returns:
+            Dict ที่มี:
+            - top_duplicates: คำซ้ำ top-N พร้อมคะแนน
+            - grouped_duplicates: กลุ่มคำที่คล้ายกัน
+            - phrase_duplicates: วลีซ้ำ top-N
+            - summary: สรุปภาพรวม
+        """
+        scores = result.get('duplicate_scores', {})
+        groups = result.get('similar_groups', {})
+        ngrams = result.get('ngram_duplicates', {})
+
+        top_duplicates = list(scores.items())[:top_n]
+
+        phrase_list = sorted(ngrams.items(), key=lambda x: -x[1])[:top_n]
+
+        multi_member_groups = {
+            k: v for k, v in groups.items()
+            if len(v.get('members', [])) > 1
+        }
+
+        total_words = result.get('total_words', 0)
+        dup_count = result.get('duplicate_count', 0)
+        unique = result.get('unique_words', 0)
+        dup_ratio = dup_count / unique if unique > 0 else 0
+
+        return {
+            'top_duplicates': [
+                {'word': w, **info} for w, info in top_duplicates
+            ],
+            'grouped_duplicates': multi_member_groups,
+            'phrase_duplicates': [
+                {'phrase': p, 'frequency': f} for p, f in phrase_list
+            ],
+            'summary': {
+                'total_words': total_words,
+                'unique_words': unique,
+                'duplicate_count': dup_count,
+                'duplicate_ratio': round(dup_ratio, 4),
+                'threshold_used': self.duplicate_threshold,
+                'total_phrase_duplicates': len(ngrams),
+                'total_similar_groups': len(multi_member_groups),
+            }
+        }
     
     def get_most_frequent_words(self, n: int = 20) -> List[Tuple[str, int]]:
         """
@@ -500,54 +791,56 @@ class ThaiDuplicateWordDetector:
 
 
 def main():
-    """ฟังก์ชันหลักสำหรับการทดสอบ"""
-    # สร้างโมเดล
-    detector = ThaiDuplicateWordDetector()
-    
-    # ข้อความตัวอย่าง
-    sample_texts = [
-        "ประเทศไทยเป็นประเทศที่สวยงาม ประเทศไทยมีวัฒนธรรมที่หลากหลาย ประเทศไทยมีอาหารที่อร่อย",
-        "การเรียนภาษาไทยเป็นเรื่องสำคัญ การเรียนภาษาไทยช่วยให้เข้าใจวัฒนธรรม การเรียนภาษาไทยเป็นประโยชน์",
-        "เทคโนโลยีใหม่ๆ ทำให้ชีวิตสะดวกขึ้น เทคโนโลยีใหม่ๆ ช่วยในการทำงาน เทคโนโลยีใหม่ๆ มีประโยชน์มาก"
-    ]
-    
-    print("=== การวิเคราะห์คำซ้ำในข้อความภาษาไทย ===\n")
-    
-    # วิเคราะห์ข้อความแต่ละข้อความ
-    for i, text in enumerate(sample_texts, 1):
-        print(f"ข้อความที่ {i}: {text}")
-        result = detector.analyze_text(text)
-        print(f"จำนวนคำทั้งหมด: {result['total_words']}")
-        print(f"จำนวนคำเฉพาะ: {result['unique_words']}")
-        print(f"คำที่ซ้ำมากที่สุด: {result['word_frequency'].most_common(3)}")
-        print("-" * 50)
-    
-    # แสดงผลรวม
-    print("\n=== ผลรวมการวิเคราะห์ ===")
-    print(f"คำที่มีความถี่สูงสุด 10 คำ:")
-    for word, freq in detector.get_most_frequent_words(10):
-        print(f"  {word}: {freq} ครั้ง")
-    
-    # สร้างกราฟ
-    print("\nกำลังสร้างกราฟ...")
-    detector.create_word_frequency_chart(15)
-    plt.savefig('word_frequency_chart.png', dpi=300, bbox_inches='tight')
-    plt.show()
-    
-    # สร้าง Word Cloud
-    detector.create_wordcloud()
-    plt.savefig('wordcloud.png', dpi=300, bbox_inches='tight')
-    plt.show()
-    
-    # สร้างกราฟ Interactive
-    interactive_fig = detector.create_interactive_chart(15)
-    if interactive_fig:
-        interactive_fig.write_html('interactive_word_chart.html')
-        interactive_fig.show()
-    
-    # ส่งออกผลลัพธ์
-    detector.export_results()
-    print("\nผลการวิเคราะห์ถูกบันทึกในไฟล์ 'word_analysis_results.xlsx'")
+    """ฟังก์ชันหลักสำหรับการทดสอบ Enhanced v2"""
+    detector = ThaiDuplicateWordDetector(
+        duplicate_threshold=2,
+        enable_ngram=True,
+        enable_similarity=True,
+        similarity_threshold=0.6,
+    )
+
+    sample_text = (
+        "ประเทศไทยเป็นประเทศที่สวยงาม ประเทศไทยมีวัฒนธรรมที่หลากหลาย "
+        "ประเทศไทยมีอาหารที่อร่อย การศึกษาขั้นพื้นฐานเป็นสิ่งสำคัญ "
+        "การศึกษามีบทบาทในการพัฒนาประเทศ กระทรวงศึกษาธิการดูแลการศึกษา "
+        "เทคโนโลยีใหม่ช่วยเพิ่มคุณภาพการศึกษา เทคโนโลยีช่วยในการทำงาน "
+        "เทคโนโลยีมีประโยชน์มาก งบประมาณด้านการศึกษาเพิ่มขึ้น "
+        "งบประมาณของกระทรวงศึกษาธิการถูกจัดสรรมาก"
+    )
+
+    print("=" * 70)
+    print(" Enhanced Duplicate Word Detector v2 — Demo")
+    print("=" * 70)
+
+    result = detector.analyze_text(sample_text)
+
+    print(f"\n📊 สรุปพื้นฐาน:")
+    print(f"   คำทั้งหมด: {result['total_words']}")
+    print(f"   คำไม่ซ้ำ: {result['unique_words']}")
+    print(f"   คำซ้ำ (≥{result['duplicate_threshold']}): {result['duplicate_count']}")
+
+    print(f"\n🏆 คำซ้ำ Top-10 (เรียงตามคะแนน):")
+    for word, info in list(result['duplicate_scores'].items())[:10]:
+        print(f"   {word:20s} freq={info['frequency']:3d}  score={info['score']:.3f}")
+
+    groups = result.get('similar_groups', {})
+    multi = {k: v for k, v in groups.items() if len(v['members']) > 1}
+    if multi:
+        print(f"\n🔗 กลุ่มคำที่คล้ายกัน ({len(multi)} กลุ่ม):")
+        for rep, g in list(multi.items())[:5]:
+            members_str = ', '.join(f"{w}({c})" for w, c in g['members'])
+            print(f"   [{rep}] total={g['total_frequency']}: {members_str}")
+
+    ngrams = result.get('ngram_duplicates', {})
+    if ngrams:
+        print(f"\n📝 วลีซ้ำ ({len(ngrams)} วลี):")
+        for phrase, freq in list(ngrams.items())[:10]:
+            print(f"   \"{phrase}\" × {freq}")
+
+    report = detector.get_duplicate_report(result)
+    print(f"\n📋 สรุปรายงาน:")
+    for k, v in report['summary'].items():
+        print(f"   {k}: {v}")
 
 
 if __name__ == "__main__":

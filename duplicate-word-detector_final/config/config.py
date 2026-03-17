@@ -54,6 +54,26 @@ DEFAULT_TARGET_POS = None
 # 'attacut': ใช้ transformer (ต้องติดตั้ง attacut, ช้าที่สุดแต่แม่นยำที่สุด)
 TOKENIZE_ENGINE = os.getenv('TOKENIZE_ENGINE', 'long')  # Default: 'long' สำหรับแยกวลีได้ดีกว่า
 
+# --- Enhanced Duplicate Detection Settings ---
+
+# Duplicate Threshold: คำที่ปรากฏ >= ค่านี้จะถือว่าเป็น "คำซ้ำ" (0 = ปิด, นับทุกคำ)
+DUPLICATE_THRESHOLD = int(os.getenv('DUPLICATE_THRESHOLD', '2'))
+
+# N-gram Detection: ตรวจจับวลีซ้ำ (กลุ่มคำที่อยู่ติดกัน)
+ENABLE_NGRAM_DETECTION = os.getenv('ENABLE_NGRAM_DETECTION', 'True').lower() == 'true'
+NGRAM_MIN_SIZE = int(os.getenv('NGRAM_MIN_SIZE', '2'))  # bigram ขึ้นไป
+NGRAM_MAX_SIZE = int(os.getenv('NGRAM_MAX_SIZE', '4'))  # สูงสุด 4-gram
+NGRAM_MIN_FREQUENCY = int(os.getenv('NGRAM_MIN_FREQUENCY', '2'))  # วลีต้องปรากฏอย่างน้อย N ครั้ง
+
+# Similarity Grouping: รวมกลุ่มคำที่คล้ายกัน เช่น "การศึกษา" กับ "การศึกษาขั้นพื้นฐาน"
+ENABLE_SIMILARITY_GROUPING = os.getenv('ENABLE_SIMILARITY_GROUPING', 'True').lower() == 'true'
+SIMILARITY_THRESHOLD = float(os.getenv('SIMILARITY_THRESHOLD', '0.6'))  # 0.0-1.0
+
+# Duplicate Scoring Weights (ใช้คำนวณคะแนนความสำคัญของคำซ้ำ)
+SCORE_WEIGHT_FREQUENCY = float(os.getenv('SCORE_WEIGHT_FREQUENCY', '0.4'))
+SCORE_WEIGHT_SPREAD = float(os.getenv('SCORE_WEIGHT_SPREAD', '0.3'))  # กระจายในหลายตำแหน่ง
+SCORE_WEIGHT_LENGTH = float(os.getenv('SCORE_WEIGHT_LENGTH', '0.3'))  # คำยาว = สำคัญกว่า
+
 # Pagination Settings
 DEFAULT_ITEMS_PER_PAGE = 25
 ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
