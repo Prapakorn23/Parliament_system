@@ -107,6 +107,12 @@ cache/
 *.uploaded
 temp_uploads/
 
+# Allow recommendation PDFs to be tracked
+!duplicate-word-detector_final/uploads/
+duplicate-word-detector_final/uploads/*
+!duplicate-word-detector_final/uploads/recommendations/
+!duplicate-word-detector_final/uploads/recommendations/**
+
 # ============================================
 # Sub-projects Specific (redundant rules removed,
 # generic patterns above already match at all levels)
